@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -47,13 +48,21 @@ def create_appointment(
 def get_taken_dates(
     year: int = Query(...),
     month: int = Query(...),
+    exclude: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     from_date = date(year, month, 1)
     next_month = month + 1 if month < 12 else 1
     next_year = year if month < 12 else year + 1
     to_date = date(next_year, next_month, 1) - timedelta(days=1)
-    taken = crud.get_taken_dates(db, from_date, to_date)
+    exclude_dates = None
+    if exclude:
+        appt = crud.get_by_number(db, exclude)
+        if appt:
+            settings = crud.get_appointment_time_settings(db)
+            span = settings.value if settings.unit == "days" else 1
+            exclude_dates = [appt.appointment_date + timedelta(days=i) for i in range(span)]
+    taken = crud.get_taken_dates(db, from_date, to_date, exclude_dates=exclude_dates)
     return [d.isoformat() for d in taken]
 
 

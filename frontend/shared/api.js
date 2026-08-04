@@ -96,6 +96,26 @@ function mechanicHeaders() {
   return key ? { "X-Mechanic-Key": key } : {};
 }
 
+function showMessage(msg) {
+  return new Promise(function (resolve) {
+    var t = window.I18N ? window.I18N.t.bind(window.I18N) : function (s) { return s; };
+    var overlay = document.createElement("div");
+    overlay.className = "fixed inset-0 z-50 bg-black/40 flex items-center justify-center";
+    overlay.innerHTML =
+      '<div class="bg-white rounded-2xl shadow-2xl p-6 mx-4 max-w-sm w-full text-center">' +
+        '<p class="text-slate-700 text-lg mb-6">' + msg + '</p>' +
+        '<div class="flex justify-center">' +
+          '<button id="message-ok" class="px-6 py-2 rounded-lg bg-blue-700 text-white hover:bg-blue-800 font-medium">' + t("dialog_ok") + '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    document.getElementById("message-ok").addEventListener("click", function () {
+      overlay.remove();
+      resolve();
+    });
+  });
+}
+
 function showConfirm(msg) {
   return new Promise(function (resolve) {
     var t = window.I18N ? window.I18N.t.bind(window.I18N) : function (s) { return s; };
@@ -126,7 +146,7 @@ window.API = {
     createAppointment: (payload) => api("/api/appointments", { method: "POST", body: payload }),
     lookupAppointment: (phone, plate) => api(`/api/appointments/lookup?phone=${encodeURIComponent(phone)}&plate=${encodeURIComponent(plate)}`),
     getAppointmentTimes: (dateStr) => api(`/api/appointments/times?for_date=${encodeURIComponent(dateStr)}`),
-    getTakenDates: (year, month) => api(`/api/appointments/taken-dates?year=${year}&month=${month}`),
+    getTakenDates: (year, month, exclude) => api(`/api/appointments/taken-dates?year=${year}&month=${month}${exclude ? `&exclude=${encodeURIComponent(exclude)}` : ""}`),
     cancelAppointment: (number, payload) => api(`/api/appointments/${encodeURIComponent(number)}/cancel`, { method: "PATCH", body: payload }),
     updateAppointment: (number, payload) => api(`/api/appointments/${encodeURIComponent(number)}`, { method: "PUT", body: payload }),
     getActiveAnnouncements: () => api("/api/announcements/active"),

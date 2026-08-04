@@ -42,8 +42,22 @@ function applyTranslations(dict) {
   document.documentElement.lang = window.I18N.lang;
 }
 
-function buildSwitcher(currentLang) {
-  if (currentLang === undefined && window.I18N) currentLang = window.I18N.lang;
+const APP_DATE_MONTHS_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+const APP_DATE_MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+function formatAppDate(dateStr) {
+  if (!dateStr) return "";
+  var s = String(dateStr).slice(0, 10);
+  var p = s.split("-");
+  if (p.length < 3) return dateStr;
+  var m = parseInt(p[1], 10) - 1;
+  var d = parseInt(p[2], 10);
+  var lang = window.I18N && window.I18N.lang ? window.I18N.lang : "es";
+  if (lang === "en") return APP_DATE_MONTHS_EN[m] + " " + d + ", " + p[0];
+  return d + " de " + APP_DATE_MONTHS_ES[m] + " de " + p[0];
+}
+
+function buildSwitcher(currentLang) {  if (currentLang === undefined && window.I18N) currentLang = window.I18N.lang;
   document.querySelectorAll("[data-lang-switcher]").forEach((el) => {
     el.innerHTML = "";
     SUPPORTED.forEach((code) => {

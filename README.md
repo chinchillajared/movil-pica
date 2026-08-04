@@ -2,8 +2,9 @@
 
 A self-contained web app for a mobile mechanic business. Clients can schedule
 appointments, check their status, and create accounts. The mechanic has a
-multi-user panel (roles: admin / mechanic) with calendar, announcements,
-settings, and a Gmail email integration.
+multi-user panel (roles: admin / mechanic) with an appointment calendar, a
+vehicle service-history log, announcements, settings, and a Gmail email
+integration.
 
 ## Stack
 
@@ -42,8 +43,9 @@ settings, and a Gmail email integration.
   administrator (role `admin`)
 - Multi-user authentication with **email + password** (JWT access/refresh tokens)
 - Roles: `admin` (full access + user management) and `mechanic`
-- Views: appointment list (filter by status/date), calendar, announcements,
-  registered clients, users, settings, and **vehicle history**
+- Landing shortcuts: appointment **calendar**, **announcements**, manual
+  appointment creation, **clients**, **users** (admin only), **settings** and
+  **vehicle history**
 - **Vehicle history (Historial de Vehículos):** register vehicles by license
   plate with make/model/year/color and a single **front photo** (base64 in DB);
   then add work visits per vehicle. Each work visit records a **title** (e.g.
@@ -62,9 +64,15 @@ settings, and a Gmail email integration.
   modal with those two tabs. A new visit is created with the assessment first;
   jobs are then added manually from the Jobs tab (each job has its own
   add/edit/delete form). A vehicle can have many visits, shown as a
-  chronological log. Searchable by plate/make/model.
+  chronological log. Searchable by plate/make/model — like the clients view, the
+  list stays empty with a *"Type to search for a vehicle"* hint until a search
+  term is entered, and shows a *"no results"* message when nothing matches.
 - Appointment status workflow: `pending → confirmed → completed`, plus `cancelled`
 - Manual appointment creation with optional client email
+- Calendar day view lists each appointment with its details in a fixed order:
+  **full name, appointment time (12-hour), plate number, appointment number**
+  and **address/location** (falls back to *"Sin ubicación"* when empty), plus
+  quick actions to confirm, complete, cancel or delete
 - **Unified header:** a single gear icon opens a menu with the logged-in user
   (name + role), the **language switcher**, **My account** (shows name, email and
   role, plus a button to change the password) and **Sign out**
@@ -82,6 +90,10 @@ settings, and a Gmail email integration.
     (e.g. *Miércoles 8 de Marzo del 2026*)
 - **User management (admin only):** create/edit users, reset passwords, activate/deactivate, delete
 - **Clients view:** list registered clients and send emails to them
+- **Announcements:** create/edit/delete banner messages with a background color
+  and a duration (in hours) or permanent; the history list shows each
+  announcement's **status** (Activo/Inactivo), **remaining time** (hours left,
+  computed from creation time, or *"Sin límite"* for permanent) and the **text**
 - **Gmail integration:** OAuth 2.0 setup to send appointment and test emails from the panel
 
 ## Quick start
@@ -278,7 +290,7 @@ After pgAdmin loads:
 | Method | Endpoint                        | Description                            |
 |--------|---------------------------------|----------------------------------------|
 | POST   | `/api/appointments`             | Create a new appointment (rate-limited)|
-| GET    | `/api/appointments/taken-dates?year=&month=` | ISO dates with bookings (1-indexed month) |
+| GET    | `/api/appointments/taken-dates?year=&month=&exclude=` | ISO dates with bookings (1-indexed month); optional `exclude` = appointment number whose own date/time stays selectable (used when editing) |
 | GET    | `/api/appointments/times?for_date=` | Taken time slots for a date         |
 | GET    | `/api/appointments/lookup?phone=&plate=` | Lookup appointment by phone + plate |
 | PUT    | `/api/appointments/{number}`    | Update appointment                    |
@@ -319,7 +331,7 @@ After pgAdmin loads:
 | POST   | `/gmail/deactivate`             | Deactivate Gmail integration           |
 | GET    | `/clients`                      | List registered clients                |
 | POST   | `/emails/send`                  | Send an email to a recipient           |
-| GET    | `/appointments?status=&date_from=&date_to=` | List appointments            |
+| GET    | `/appointments?status=&date_from=` | List appointments (optional status filter and date_from) |
 | POST   | `/appointments`                 | Create appointment (manual)            |
 | PATCH  | `/appointments/{number}`        | Update status (e.g. `{"status":"confirmed"}`) |
 | DELETE | `/appointments/{number}`        | Delete an appointment                  |
@@ -333,6 +345,14 @@ After pgAdmin loads:
 | POST   | `/days-off`                     | Add a day off                          |
 | DELETE | `/days-off/{date}`              | Remove a day off                       |
 | GET/PUT| `/appointment-time`             | Get / update appointment time settings |
+| GET    | `/vehicles?q=`                 | Search vehicles by plate/make/model     |
+| POST   | `/vehicles`                    | Register a vehicle                      |
+| GET    | `/vehicles/{id}`               | Vehicle detail (photos, visits)         |
+| PUT    | `/vehicles/{id}`               | Update a vehicle                        |
+| DELETE | `/vehicles/{id}`               | Delete a vehicle and its visits         |
+| POST   | `/vehicles/{id}/visits`        | Add a work record to a vehicle          |
+| PUT    | `/visits/{id}`                 | Update a work record                    |
+| DELETE | `/visits/{id}`                 | Delete a work record                    |
 
 ### Realtime
 

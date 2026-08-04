@@ -194,44 +194,125 @@ function hmToMin(hhmm) {
   return parseInt(p[0], 10) * 60 + parseInt(p[1] || "0", 10);
 }
 
-function buildTimePicker(container, value, onChange) {
+function buildTimeField(container, value, onChange) {
   container.innerHTML = "";
   var v = to12(value);
-  var hourSel = document.createElement("select");
-  hourSel.className = "border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white";
-  for (var h = 1; h <= 12; h++) {
-    var o = document.createElement("option");
-    o.value = String(h);
-    o.textContent = String(h);
-    if (h === v.hour) o.selected = true;
-    hourSel.appendChild(o);
+  var state = { hour: v.hour, minute: parseInt(v.minute, 10), ampm: v.ampm };
+
+  function normalizeHour(h) {
+    if (isNaN(h)) return state.hour;
+    h = Math.round(h);
+    if (h < 1) h = 1;
+    if (h > 12) h = 12;
+    return h;
   }
-  var minSel = document.createElement("select");
-  minSel.className = "border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white";
-  var minutes = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
-  if (minutes.indexOf(v.minute) === -1) minutes.push(v.minute);
-  minutes.forEach(function (m) {
-    var o = document.createElement("option");
-    o.value = m;
-    o.textContent = m;
-    if (m === v.minute) o.selected = true;
-    minSel.appendChild(o);
+
+  function normalizeMinute(m) {
+    if (isNaN(m)) return state.minute;
+    m = Math.round(m / 5) * 5;
+    if (m < 0) m = 0;
+    if (m > 55) m = 55;
+    return m;
+  }
+
+  function commit() {
+    state.hour = normalizeHour(parseInt(hourField.input.value, 10));
+    state.minute = normalizeMinute(parseInt(minField.input.value, 10));
+    hourField.input.value = state.hour;
+    minField.input.value = String(state.minute).padStart(2, "0");
+    onChange(from12(state.hour, String(state.minute).padStart(2, "0"), state.ampm));
+  }
+
+  function stepHour(delta) {
+    state.hour = normalizeHour(state.hour + delta);
+    hourField.input.value = state.hour;
+    commit();
+  }
+
+  function stepMinute(delta) {
+    state.minute = normalizeMinute(state.minute + delta);
+    minField.input.value = String(state.minute).padStart(2, "0");
+    commit();
+  }
+
+  function makeStepper(initial, label) {
+    var box = document.createElement("div");
+    box.className = "inline-flex items-center rounded-lg border border-slate-300 bg-white overflow-hidden";
+    var dec = document.createElement("button");
+    dec.type = "button";
+    dec.className = "w-7 h-9 text-slate-500 hover:text-slate-800 hover:bg-slate-100 text-base leading-none";
+    dec.textContent = "−";
+    dec.setAttribute("aria-label", label);
+    var input = document.createElement("input");
+    input.type = "text";
+    input.inputMode = "numeric";
+    input.maxLength = 2;
+    input.setAttribute("aria-label", label);
+    input.className = "w-8 h-9 text-center text-sm font-semibold text-slate-700 bg-transparent outline-none focus:bg-brand-50";
+    input.value = String(initial);
+    var inc = document.createElement("button");
+    inc.type = "button";
+    inc.className = "w-7 h-9 text-slate-500 hover:text-slate-800 hover:bg-slate-100 text-base leading-none";
+    inc.textContent = "+";
+    inc.setAttribute("aria-label", label);
+    box.appendChild(dec);
+    box.appendChild(input);
+    box.appendChild(inc);
+    return { box: box, input: input, dec: dec, inc: inc };
+  }
+
+  var wrap = document.createElement("div");
+  wrap.className = "inline-flex items-center gap-1.5 flex-wrap";
+  var hourField = makeStepper(state.hour, t("settings_hour"));
+  wrap.appendChild(hourField.box);
+  var colon = document.createElement("span");
+  colon.className = "text-slate-400 font-semibold";
+  colon.textContent = ":";
+  wrap.appendChild(colon);
+  var minField = makeStepper(String(state.minute).padStart(2, "0"), t("settings_minute"));
+  wrap.appendChild(minField.box);
+
+  hourField.dec.addEventListener("click", function () { stepHour(-1); });
+  hourField.inc.addEventListener("click", function () { stepHour(1); });
+  minField.dec.addEventListener("click", function () { stepMinute(-5); });
+  minField.inc.addEventListener("click", function () { stepMinute(5); });
+
+  hourField.input.addEventListener("change", commit);
+  minField.input.addEventListener("change", commit);
+  hourField.input.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowUp") { e.preventDefault(); stepHour(1); }
+    if (e.key === "ArrowDown") { e.preventDefault(); stepHour(-1); }
   });
-  var ampmSel = document.createElement("select");
-  ampmSel.className = "border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white";
+  minField.input.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowUp") { e.preventDefault(); stepMinute(5); }
+    if (e.key === "ArrowDown") { e.preventDefault(); stepMinute(-5); }
+  });
+
+  var ampm = document.createElement("div");
+  ampm.className = "inline-flex rounded-lg bg-slate-100 p-0.5";
   ["AM", "PM"].forEach(function (p) {
-    var o = document.createElement("option");
-    o.value = p;
-    o.textContent = p;
-    if (p === v.ampm) o.selected = true;
-    ampmSel.appendChild(o);
-  });
-  [hourSel, minSel, ampmSel].forEach(function (sel) {
-    sel.addEventListener("change", function () {
-      onChange(from12(hourSel.value, minSel.value, ampmSel.value));
+    var b = document.createElement("button");
+    b.type = "button";
+    b.dataset.ampm = p;
+    b.textContent = p;
+    b.className = state.ampm === p
+      ? "px-3 py-1.5 text-xs font-semibold rounded-md bg-brand-600 text-white"
+      : "px-3 py-1.5 text-xs font-semibold rounded-md text-slate-600 hover:bg-white";
+    b.addEventListener("click", function () {
+      state.ampm = p;
+      ampm.querySelectorAll("button").forEach(function (x) {
+        var on = x.dataset.ampm === p;
+        x.className = on
+          ? "px-3 py-1.5 text-xs font-semibold rounded-md bg-brand-600 text-white"
+          : "px-3 py-1.5 text-xs font-semibold rounded-md text-slate-600 hover:bg-white";
+      });
+      commit();
     });
-    container.appendChild(sel);
+    ampm.appendChild(b);
   });
+  wrap.appendChild(ampm);
+
+  container.appendChild(wrap);
 }
 
 function monthNamesES() {
@@ -250,9 +331,7 @@ function dayLabel(i) {
 }
 
 function formatLongDate(dateStr) {
-  var p = String(dateStr).split("-");
-  var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
-  return weekdayNamesES()[d.getDay()] + " " + p[2] + " de " + monthNamesES()[parseInt(p[1], 10) - 1] + " de " + p[0];
+  return window.formatAppDate ? window.formatAppDate(dateStr) : dateStr;
 }
 
 function statusLabel(s) {
@@ -544,8 +623,7 @@ function initCreatePage() {
     if (step === 2) {
       var dateDisplay = $("step2-date-display");
       if (dateDisplay && selectedDate) {
-        var parts = selectedDate.split("-");
-        dateDisplay.textContent = parts[2] + " de " + monthNames[parseInt(parts[1], 10) - 1] + " de " + parts[0];
+        dateDisplay.textContent = formatLongDate(selectedDate);
       }
       renderTimeSlots();
     }
@@ -553,8 +631,7 @@ function initCreatePage() {
       var finalDate = $("final-date-display");
       var finalTime = $("final-time-display");
       if (finalDate && selectedDate) {
-        var p = selectedDate.split("-");
-        finalDate.textContent = p[2] + "/" + p[1] + "/" + p[0];
+        finalDate.textContent = formatLongDate(selectedDate);
       }
       if (finalTime && selectedTime) finalTime.textContent = selectedTime;
     }
@@ -917,11 +994,16 @@ function buildApptRow(a) {
   row.className = "py-3 border-b border-slate-100";
 
   var info = document.createElement("div");
-  info.className = "flex flex-wrap items-center justify-between gap-2 text-sm mb-3";
+  info.className = "flex flex-wrap items-start justify-between gap-2 text-sm mb-3";
+  var tv = to12(a.appointment_time);
   info.innerHTML =
-    "<div><span class='font-medium text-slate-800'>" + escapeHTML(String(a.appointment_time).slice(0, 5)) + "</span> " +
-    "<span class='text-slate-600'>" + escapeHTML(a.first_name + " " + a.last_name) + " (" + escapeHTML(a.plate) + ")</span>" +
-    "<span class='text-xs text-slate-400 ml-1'>" + escapeHTML(a.appointment_number) + "</span></div>";
+    "<div class='space-y-1'>" +
+      "<div><span class='text-slate-500'>" + t("cal_name") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(a.first_name + " " + a.last_name) + "</span></div>" +
+      "<div><span class='text-slate-500'>" + t("cal_time") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(tv.hour + ":" + tv.minute + " " + tv.ampm) + "</span></div>" +
+      "<div><span class='text-slate-500'>" + t("cal_plate") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(a.plate) + "</span></div>" +
+      "<div><span class='text-slate-500'>" + t("cal_number") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(a.appointment_number) + "</span></div>" +
+      "<div><span class='text-slate-500'>" + t("cal_address") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(a.address || t("cal_no_location")) + "</span></div>" +
+    "</div>";
   var badge = document.createElement("span");
   badge.className = "text-xs px-2 py-1 rounded-full " + statusBadgeClass(a.status);
   badge.textContent = statusLabel(a.status);
@@ -1142,6 +1224,14 @@ function resetAnnounceForm() {
   hideBox("announce-error");
 }
 
+function remainingAnnounceHours(a) {
+  if (a.is_permanent) return null;
+  var dur = a.duration_hours || 0;
+  var created = a.created_at ? new Date(a.created_at).getTime() : Date.now();
+  var elapsed = (Date.now() - created) / 3600000;
+  return Math.max(0, Math.ceil(dur - elapsed));
+}
+
 function loadAnnouncements() {
   var list = $("announce-list");
   var empty = $("announce-empty");
@@ -1165,16 +1255,19 @@ function loadAnnouncements() {
       var row = document.createElement("div");
       row.className = "rounded-lg border border-slate-200 p-4 shadow-sm";
       row.style.backgroundColor = a.bg_color || "#fff";
-      var durationLabel = a.is_permanent ? t("announce_permanent") : (a.duration_hours + "h");
-      var status = (a.is_active ? t("announce_active") : t("announce_inactive"));
+      var remain = remainingAnnounceHours(a);
+      var isActive = a.is_active && (a.is_permanent || remain > 0);
+      var remainingLabel = a.is_permanent ? t("announce_permanent") : (remain + "h");
       var header = document.createElement("div");
-      header.className = "flex items-center justify-between gap-2";
-      var statusEl = document.createElement("span");
-      statusEl.className = "text-xs px-2 py-1 rounded-full bg-white/70 text-slate-700 font-medium";
-      statusEl.textContent = status + " · " + durationLabel;
-      header.appendChild(statusEl);
+      header.className = "flex items-start justify-between gap-2";
+      var info = document.createElement("div");
+      info.className = "text-sm space-y-1";
+      info.innerHTML =
+        "<div><span class='text-slate-500'>" + t("announce_state") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(isActive ? t("announce_active") : t("announce_inactive")) + "</span> <span class='text-slate-500 ml-3'>" + t("announce_remaining") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(remainingLabel) + "</span></div>" +
+        "<div><span class='text-slate-500'>" + t("announce_text") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(a.text) + "</span></div>";
+      header.appendChild(info);
       var actions = document.createElement("div");
-      actions.className = "flex gap-2";
+      actions.className = "flex gap-2 shrink-0";
       var editBtn = smallBtn(t("announce_edit"), "btn-secondary", function () {
         editAnnouncement(a);
       });
@@ -1191,10 +1284,6 @@ function loadAnnouncements() {
       actions.appendChild(delBtn);
       header.appendChild(actions);
       row.appendChild(header);
-      var body = document.createElement("p");
-      body.className = "text-sm text-slate-800 mt-2";
-      body.textContent = a.text;
-      row.appendChild(body);
       list.appendChild(row);
     });
   }).catch(function (err) {
@@ -1468,9 +1557,22 @@ function renderVehiclesList(q) {
   list.innerHTML = "";
   if (empty) empty.classList.add("hidden");
   hideBox("vehicles-error");
-  window.API.mechanic.listVehicles(q || "").then(function (vehicles) {
+  if (q === undefined) {
+    q = $("vehicles-search") ? $("vehicles-search").value.trim() : "";
+  }
+  if (!q) {
+    if (empty) {
+      empty.textContent = t("vehicles_hint");
+      empty.classList.remove("hidden");
+    }
+    return;
+  }
+  window.API.mechanic.listVehicles(q).then(function (vehicles) {
     if (vehicles.length === 0) {
-      if (empty) empty.classList.remove("hidden");
+      if (empty) {
+        empty.textContent = t("vehicles_no_results");
+        empty.classList.remove("hidden");
+      }
       return;
     }
     vehicles.forEach(function (v) {
@@ -1556,7 +1658,7 @@ function renderVehicleDetail(vehicleId) {
         var info2 = document.createElement("div");
         info2.innerHTML =
           "<p class='font-medium text-slate-800'>" + escapeHTML(vis.title) + "</p>" +
-          "<p class='text-sm text-slate-500'>" + escapeHTML(String(vis.visit_date)) + " &middot; " + (vis.jobs ? vis.jobs.length : 0) + " " + escapeHTML(t("visits_job").toLowerCase()) + "</p>";
+          "<p class='text-sm text-slate-500'>" + escapeHTML(formatLongDate(vis.visit_date)) + " &middot; " + (vis.jobs ? vis.jobs.length : 0) + " " + escapeHTML(t("visits_job").toLowerCase()) + "</p>";
         item.appendChild(info2);
         var arrow = document.createElement("span");
         arrow.className = "text-slate-400";
@@ -2216,7 +2318,6 @@ function openJobModal(visit, onSave, editIndex) {
    ================================================================ */
 
 var settingsDays = [];
-var applySelections = {};
 var apptTimeState = { unit: "hours", value: 2 };
 var gmailLoaded = false;
 var settingsWired = false;
@@ -2300,9 +2401,77 @@ function initSettingsSchedule() {
       };
     });
     renderSettingsDays();
+    renderSettingsPresets();
   }).catch(function (err) {
     showErrorBox("settings-error", err.message || t("error_generic"));
   });
+}
+
+function renderSettingsPresets() {
+  var box = $("settings-presets");
+  if (!box) return;
+  box.innerHTML = "";
+  var label = document.createElement("span");
+  label.className = "text-sm text-slate-600 font-medium";
+  label.textContent = t("settings_presets");
+  box.appendChild(label);
+  [["07:00", "15:00"], ["08:00", "16:00"], ["09:00", "17:00"], ["10:00", "18:00"]].forEach(function (p) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "px-3 py-1.5 rounded-full border text-sm border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-brand-500";
+    b.textContent = formatTimeRange(p[0], p[1]);
+    b.addEventListener("click", function () { applyPreset(p[0], p[1]); });
+    box.appendChild(b);
+  });
+  var sep = document.createElement("span");
+  sep.className = "w-px h-5 bg-slate-200";
+  box.appendChild(sep);
+  var allOn = document.createElement("button");
+  allOn.type = "button";
+  allOn.className = "btn-secondary !px-3 !py-1.5 text-xs";
+  allOn.textContent = t("settings_activate_all");
+  allOn.addEventListener("click", activateAllDays);
+  box.appendChild(allOn);
+  var allOff = document.createElement("button");
+  allOff.type = "button";
+  allOff.className = "btn-secondary !px-3 !py-1.5 text-xs";
+  allOff.textContent = t("settings_deactivate_all");
+  allOff.addEventListener("click", deactivateAllDays);
+  box.appendChild(allOff);
+}
+
+function formatTimeRange(s, e) {
+  var a = to12(s), b = to12(e);
+  return a.hour + ":" + a.minute + " " + a.ampm + " – " + b.hour + ":" + b.minute + " " + b.ampm;
+}
+
+function applyPreset(start, end) {
+  if (settingsDays.length === 0) {
+    flash(t("settings_preset_no_days"), true);
+    return;
+  }
+  settingsDays.forEach(function (d) {
+    d.start_time = start;
+    d.end_time = end;
+  });
+  renderSettingsDays();
+  flash(t("settings_preset_applied"));
+}
+
+function activateAllDays() {
+  [1, 2, 3, 4, 5, 6, 0].forEach(function (i) {
+    var found = settingsDays.some(function (d) { return d.day === i; });
+    if (!found) {
+      settingsDays.push({ day: i, start_time: "08:00", end_time: "17:00", lunch_start: null, lunch_end: null });
+    }
+  });
+  renderSettingsDays();
+  flash(t("settings_activate_all_done"));
+}
+
+function deactivateAllDays() {
+  settingsDays = [];
+  renderSettingsDays();
 }
 
 function renderSettingsDays() {
@@ -2330,10 +2499,22 @@ function buildDayRow(day, entry) {
   label.className = "font-semibold text-slate-700";
   label.textContent = dayLabel(day);
   head.appendChild(label);
+  var toggleWrap = document.createElement("div");
+  toggleWrap.className = "flex items-center gap-2";
   var toggle = document.createElement("button");
   toggle.type = "button";
-  toggle.className = active ? "btn-primary !px-4 !py-1.5 text-sm" : "btn-secondary !px-4 !py-1.5 text-sm";
-  toggle.textContent = active ? t("announce_active") : t("users_inactive");
+  toggle.setAttribute("role", "switch");
+  toggle.setAttribute("aria-checked", active ? "true" : "false");
+  toggle.setAttribute("aria-label", dayLabel(day));
+  toggle.className = "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors " +
+    (active ? "bg-brand-600" : "bg-slate-300");
+  var knob = document.createElement("span");
+  knob.className = "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform " +
+    (active ? "translate-x-[22px]" : "translate-x-0.5");
+  toggle.appendChild(knob);
+  var stateLabel = document.createElement("span");
+  stateLabel.className = "text-xs font-semibold " + (active ? "text-brand-700" : "text-slate-400");
+  stateLabel.textContent = active ? t("announce_active") : t("users_inactive");
   toggle.addEventListener("click", function () {
     if (active) {
       settingsDays = settingsDays.filter(function (d) { return d.day !== day; });
@@ -2342,125 +2523,103 @@ function buildDayRow(day, entry) {
     }
     renderSettingsDays();
   });
-  head.appendChild(toggle);
+  toggleWrap.appendChild(toggle);
+  toggleWrap.appendChild(stateLabel);
+  head.appendChild(toggleWrap);
   row.appendChild(head);
 
-  if (active) {
-    var timeRow = document.createElement("div");
-    timeRow.className = "mt-3 flex flex-wrap items-center gap-3";
-    var startWrap = document.createElement("div");
-    startWrap.innerHTML = "<p class='text-xs font-medium text-slate-500 mb-1'>" + escapeHTML(t("settings_start_time")) + "</p>";
-    var startSel = document.createElement("div");
-    startWrap.appendChild(startSel);
-    timeRow.appendChild(startWrap);
-    var endWrap = document.createElement("div");
-    endWrap.innerHTML = "<p class='text-xs font-medium text-slate-500 mb-1'>" + escapeHTML(t("settings_end_time")) + "</p>";
-    var endSel = document.createElement("div");
-    endWrap.appendChild(endSel);
-    timeRow.appendChild(endWrap);
-    row.appendChild(timeRow);
-    buildTimePicker(startSel, entry.start_time, function (v) {
-      entry.start_time = v;
-      renderSettingsDays();
-    });
-    buildTimePicker(endSel, entry.end_time, function (v) {
-      entry.end_time = v;
-      renderSettingsDays();
-    });
+  if (!active) return row;
 
-    var lunchBtn = document.createElement("button");
-    lunchBtn.type = "button";
-    lunchBtn.className = active ? "mt-3 btn-secondary text-sm" : "mt-3 btn-secondary text-sm";
-    lunchBtn.textContent = t("settings_lunch_time") + (entry.lunch_start ? " ✓" : "");
-    lunchBtn.addEventListener("click", function () {
-      if (entry.lunch_start) {
-        entry.lunch_start = null;
-        entry.lunch_end = null;
-      } else {
-        entry.lunch_start = "12:00";
-        entry.lunch_end = "13:00";
-      }
-      renderSettingsDays();
-    });
-    row.appendChild(lunchBtn);
+  function timeField(parent, labelKey) {
+    var wrap = document.createElement("div");
+    var p = document.createElement("p");
+    p.className = "text-xs font-medium text-slate-500 mb-1";
+    p.textContent = t(labelKey);
+    var sel = document.createElement("div");
+    wrap.appendChild(p);
+    wrap.appendChild(sel);
+    parent.appendChild(wrap);
+    return sel;
+  }
 
+  function updateInvalid() {
+    var invalidHours = entry.start_time >= entry.end_time;
+    var invalidLunch = !!(entry.lunch_start && entry.lunch_end && entry.lunch_start >= entry.lunch_end);
+    var msg = invalidHours ? t("settings_invalid_hours") : invalidLunch ? t("settings_invalid_lunch") : "";
+    invalidHint.textContent = msg;
+    invalidHint.classList.toggle("hidden", !msg);
+    row.classList.toggle("border-red-300", !!msg);
+  }
+
+  var invalidHint = document.createElement("p");
+  invalidHint.className = "hidden mt-2 text-xs text-red-600 font-medium";
+  row.appendChild(invalidHint);
+
+  var timeRow = document.createElement("div");
+  timeRow.className = "mt-3 flex flex-wrap items-end gap-3";
+  row.appendChild(timeRow);
+  buildTimeField(timeField(timeRow, "settings_start_time"), entry.start_time, function (v) {
+    entry.start_time = v;
+    updateInvalid();
+  });
+  buildTimeField(timeField(timeRow, "settings_end_time"), entry.end_time, function (v) {
+    entry.end_time = v;
+    updateInvalid();
+  });
+
+  var lunchBtn = document.createElement("button");
+  lunchBtn.type = "button";
+  lunchBtn.className = "mt-3 btn-secondary text-sm";
+  lunchBtn.textContent = t("settings_lunch_time") + (entry.lunch_start ? " ✓" : "");
+  lunchBtn.addEventListener("click", function () {
     if (entry.lunch_start) {
-      var lunchRow = document.createElement("div");
-      lunchRow.className = "mt-2 flex flex-wrap items-center gap-3";
-      var lsWrap = document.createElement("div");
-      lsWrap.innerHTML = "<p class='text-xs font-medium text-slate-500 mb-1'>" + escapeHTML(t("settings_lunch_start")) + "</p>";
-      var lsSel = document.createElement("div");
-      lsWrap.appendChild(lsSel);
-      lunchRow.appendChild(lsWrap);
-      var leWrap = document.createElement("div");
-      leWrap.innerHTML = "<p class='text-xs font-medium text-slate-500 mb-1'>" + escapeHTML(t("settings_lunch_end")) + "</p>";
-      var leSel = document.createElement("div");
-      leWrap.appendChild(leSel);
-      lunchRow.appendChild(leWrap);
-      row.appendChild(lunchRow);
-      buildTimePicker(lsSel, entry.lunch_start, function (v) {
-        entry.lunch_start = v;
-        renderSettingsDays();
-      });
-      buildTimePicker(leSel, entry.lunch_end, function (v) {
-        entry.lunch_end = v;
-        renderSettingsDays();
-      });
+      entry.lunch_start = null;
+      entry.lunch_end = null;
+    } else {
+      entry.lunch_start = "12:00";
+      entry.lunch_end = "13:00";
     }
+    renderSettingsDays();
+  });
+  row.appendChild(lunchBtn);
 
-    var others = settingsDays.filter(function (d) { return d.day !== day; });
-    if (others.length) {
-      var applyBlock = document.createElement("div");
-      applyBlock.className = "mt-4 pt-3 border-t border-slate-100";
-      var q = document.createElement("p");
-      q.className = "text-sm font-medium text-slate-700 mb-2";
-      q.textContent = t("settings_apply_question");
-      applyBlock.appendChild(q);
-      var chips = document.createElement("div");
-      chips.className = "flex flex-wrap gap-2 mb-3";
+  if (entry.lunch_start) {
+    var lunchRow = document.createElement("div");
+    lunchRow.className = "mt-2 flex flex-wrap items-end gap-3";
+    row.appendChild(lunchRow);
+    buildTimeField(timeField(lunchRow, "settings_lunch_start"), entry.lunch_start, function (v) {
+      entry.lunch_start = v;
+      updateInvalid();
+    });
+    buildTimeField(timeField(lunchRow, "settings_lunch_end"), entry.lunch_end, function (v) {
+      entry.lunch_end = v;
+      updateInvalid();
+    });
+  }
+
+  updateInvalid();
+
+  var order = [1, 2, 3, 4, 5, 6, 0];
+  var others = settingsDays.filter(function (d) { return order.indexOf(d.day) > order.indexOf(day); });
+  if (others.length) {
+    var copyBlock = document.createElement("div");
+    copyBlock.className = "mt-4 pt-3 border-t border-slate-100";
+    var copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "btn-secondary text-sm";
+    copyBtn.textContent = t("settings_copy_following");
+    copyBtn.addEventListener("click", function () {
       others.forEach(function (d) {
-        var key = day + "_" + d.day;
-        var chip = document.createElement("button");
-        chip.type = "button";
-        chip.className = "px-3 py-1.5 rounded-full border text-sm " +
-          (applySelections[key] ? "bg-brand-600 border-brand-600 text-white" : "border-slate-300 text-slate-600 hover:bg-slate-50");
-        chip.textContent = dayLabel(d.day);
-        chip.addEventListener("click", function () {
-          applySelections[key] = !applySelections[key];
-          renderSettingsDays();
-        });
-        chips.appendChild(chip);
+        d.start_time = entry.start_time;
+        d.end_time = entry.end_time;
+        d.lunch_start = entry.lunch_start;
+        d.lunch_end = entry.lunch_end;
       });
-      applyBlock.appendChild(chips);
-      var applyBtn = document.createElement("button");
-      applyBtn.type = "button";
-      applyBtn.className = "btn-secondary text-sm";
-      applyBtn.textContent = t("settings_apply");
-      applyBtn.addEventListener("click", function () {
-        var applied = false;
-        others.forEach(function (d) {
-          var key = day + "_" + d.day;
-          if (applySelections[key]) {
-            var targetEntry = null;
-            for (var i = 0; i < settingsDays.length; i++) {
-              if (settingsDays[i].day === d.day) { targetEntry = settingsDays[i]; break; }
-            }
-            if (targetEntry) {
-              targetEntry.start_time = entry.start_time;
-              targetEntry.end_time = entry.end_time;
-              targetEntry.lunch_start = entry.lunch_start;
-              targetEntry.lunch_end = entry.lunch_end;
-            }
-            applySelections[key] = false;
-            applied = true;
-          }
-        });
-        if (applied) flash(t("settings_apply_done"));
-        renderSettingsDays();
-      });
-      applyBlock.appendChild(applyBtn);
-      row.appendChild(applyBlock);
-    }
+      flash(t("settings_apply_done"));
+      renderSettingsDays();
+    });
+    copyBlock.appendChild(copyBtn);
+    row.appendChild(copyBlock);
   }
   return row;
 }
@@ -2502,19 +2661,7 @@ function saveSchedule() {
 
 function initSettingsDaysOff() {
   var pickerBtn = $("day-off-picker");
-  if (pickerBtn) {
-    pickerBtn.onclick = function () {
-      openDatePicker(function (dateStr) {
-        var sel = $("day-off-selected");
-        if (sel) {
-          sel.textContent = formatLongDate(dateStr);
-          sel.dataset.value = dateStr;
-        }
-      });
-    };
-  }
-  var addBtn = $("day-off-add");
-  if (addBtn) addBtn.onclick = addDayOff;
+  if (pickerBtn) pickerBtn.onclick = openDatePicker;
   loadDaysOff();
 }
 
@@ -2553,40 +2700,26 @@ function loadDaysOff() {
   });
 }
 
-function addDayOff() {
-  var sel = $("day-off-selected");
-  var dateStr = sel ? sel.dataset.value : "";
-  if (!dateStr) {
-    showErrorBox("days-off-error", t("settings_days_off_required"));
-    return;
-  }
-  var reason = $("day-off-reason") ? $("day-off-reason").value.trim() : "";
-  hideBox("days-off-error");
-  var btn = $("day-off-add");
-  if (btn) btn.disabled = true;
-  window.API.mechanic.addDayOff({ day_off: dateStr, reason: reason }).then(function () {
-    if (btn) btn.disabled = false;
-    if (sel) { sel.textContent = ""; delete sel.dataset.value; }
-    var reasonInput = $("day-off-reason");
-    if (reasonInput) reasonInput.value = "";
-    loadDaysOff();
-    flash("Día libre agregado.");
-  }).catch(function (err) {
-    if (btn) btn.disabled = false;
-    showErrorBox("days-off-error", err.message || t("error_generic"));
-  });
-}
-
-function openDatePicker(onSelect) {
+function openDatePicker() {
   var m = openModal(t("settings_days_off_pick"), "");
   var year = new Date().getFullYear();
   var month = new Date().getMonth();
   var monthNames = monthNamesES();
   var dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  var selected = {};
+
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+
+  function isWorkingDow(dow) {
+    for (var i = 0; i < settingsDays.length; i++) {
+      if (settingsDays[i].day === dow) return true;
+    }
+    return false;
+  }
 
   function render() {
     var head = document.createElement("div");
-    head.className = "flex items-center justify-between mb-3";
+    head.className = "flex items-center justify-between mb-2";
     var prev = document.createElement("button");
     prev.type = "button";
     prev.className = "btn-secondary !px-3 !py-1";
@@ -2612,22 +2745,79 @@ function openDatePicker(onSelect) {
       c.textContent = d;
       grid.appendChild(c);
     });
-    var firstDay = new Date(year, month, 1).getDay();
+
+    var firstDow = new Date(year, month, 1).getDay();
     var daysInMonth = new Date(year, month + 1, 0).getDate();
-    for (var i = 0; i < firstDay; i++) grid.appendChild(document.createElement("div"));
+    for (var i = 0; i < firstDow; i++) grid.appendChild(document.createElement("div"));
     for (var d = 1; d <= daysInMonth; d++) {
+      var date = new Date(year, month, d);
+      var ds = year + "-" + pad(month + 1) + "-" + pad(d);
+      var working = isWorkingDow(date.getDay());
+      var isSel = !!selected[ds];
       var cell = document.createElement("button");
       cell.type = "button";
-      cell.className = "p-2 rounded-lg hover:bg-slate-100 cursor-pointer text-sm";
+      cell.setAttribute("aria-pressed", isSel ? "true" : "false");
       cell.textContent = d;
-      let ds = year + "-" + String(month + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
-      cell.addEventListener("click", function () {
-        closeModal();
-        onSelect(ds);
-      });
+      if (!working) {
+        cell.className = "p-2 rounded-lg text-sm text-slate-300 cursor-not-allowed border border-slate-200 bg-slate-50";
+        cell.disabled = true;
+      } else if (isSel) {
+        cell.className = "p-2 rounded-lg text-sm font-semibold transition border bg-brand-600 text-white border-brand-600";
+      } else {
+        cell.className = "p-2 rounded-lg text-sm transition border bg-green-50 hover:bg-green-100 text-slate-800 border-green-200 cursor-pointer";
+        cell.addEventListener("click", (function (ds) {
+          return function () {
+            if (selected[ds]) delete selected[ds];
+            else selected[ds] = true;
+            render();
+          };
+        })(ds));
+      }
       grid.appendChild(cell);
     }
     m.body.appendChild(grid);
+
+    var legend = document.createElement("div");
+    legend.className = "mt-3 flex items-center gap-4 text-xs text-slate-500";
+    var lg1 = document.createElement("span");
+    lg1.innerHTML = "<span class='inline-block w-3 h-3 rounded bg-green-200 align-middle'></span> " + escapeHTML(t("settings_days_off_legend_work"));
+    var lg2 = document.createElement("span");
+    lg2.innerHTML = "<span class='inline-block w-3 h-3 rounded bg-brand-600 align-middle'></span> " + escapeHTML(t("settings_days_off_legend_selected"));
+    legend.appendChild(lg1);
+    legend.appendChild(lg2);
+    m.body.appendChild(legend);
+
+    var footer = document.createElement("div");
+    footer.className = "mt-4 flex items-center justify-between gap-2";
+    var count = document.createElement("span");
+    count.className = "text-sm text-slate-600 font-medium";
+    var n = Object.keys(selected).length;
+    count.textContent = n + " " + t("settings_days_off_selected");
+    var addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "btn-primary";
+    addBtn.textContent = t("settings_days_off_add_selected");
+    addBtn.disabled = n === 0;
+    addBtn.addEventListener("click", function () {
+      var dates = Object.keys(selected).sort();
+      var reason = $("day-off-reason") ? $("day-off-reason").value.trim() : "";
+      addBtn.disabled = true;
+      var i = 0;
+      function next() {
+        if (i >= dates.length) {
+          loadDaysOff();
+          closeModal();
+          flash(t("settings_days_off_added"));
+          return;
+        }
+        var date = dates[i++];
+        window.API.mechanic.addDayOff({ day_off: date, reason: reason }).then(next).catch(next);
+      }
+      next();
+    });
+    footer.appendChild(count);
+    footer.appendChild(addBtn);
+    m.body.appendChild(footer);
 
     prev.addEventListener("click", function () {
       month--;

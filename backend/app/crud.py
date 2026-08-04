@@ -93,8 +93,14 @@ def delete_appointment(db: Session, obj: models.Appointment) -> None:
     db.commit()
 
 
-def get_taken_dates(db: Session, from_date: date, to_date: date) -> list[date]:
+def get_taken_dates(
+    db: Session,
+    from_date: date,
+    to_date: date,
+    exclude_dates: Optional[list[date]] = None,
+) -> list[date]:
     settings = get_appointment_time_settings(db)
+    exclude = set(exclude_dates or [])
     query_from = from_date - timedelta(days=1)
     query_to = to_date + timedelta(days=1)
     stmt = (
@@ -115,7 +121,7 @@ def get_taken_dates(db: Session, from_date: date, to_date: date) -> list[date]:
     # In "hours" mode, appointment days stay available (only hours are blocked).
     for d in list_days_off(db):
         blocked.add(d.day_off)
-    return sorted([d for d in blocked if from_date <= d <= to_date])
+    return sorted([d for d in blocked if from_date <= d <= to_date and d not in exclude])
 
 
 def get_taken_times(db: Session, for_date: date) -> list[str]:

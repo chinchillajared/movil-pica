@@ -37,7 +37,7 @@ function buildTimeSlotsFor(daySch) {
 function showError(formEl, message) {
   const box = formEl.querySelector("#form-error");
   if (!box) {
-    alert(message);
+    showMessage(message);
     return;
   }
   box.textContent = message;
@@ -83,6 +83,7 @@ function initSchedule() {
   var calYear = new Date().getFullYear();
   var editExcludeDate = null;
   var editExcludeTime = null;
+  var editExcludeNumber = null;
   var today = new Date();
   today.setHours(0, 0, 0, 0);
   var todayMs = today.getTime();
@@ -125,7 +126,7 @@ function initSchedule() {
   /* ---------- CALENDAR ---------- */
 
   function renderCalendar(month, year) {
-    window.API.public.getTakenDates(year, month + 1).then(function (takenDates) {
+    window.API.public.getTakenDates(year, month + 1, editExcludeNumber).then(function (takenDates) {
       if (editExcludeDate) {
         takenDates = takenDates.filter(function (d) { return d !== editExcludeDate; });
       }
@@ -274,11 +275,7 @@ function initSchedule() {
       return;
     }
     err.classList.add("hidden");
-    var parts = state.dateStr.split("-");
-    var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-    document.getElementById("step2-date-display").textContent = d.toLocaleDateString(window.I18N.lang, {
-      weekday: "long", year: "numeric", month: "long", day: "numeric"
-    });
+    document.getElementById("step2-date-display").textContent = formatAppDate(state.dateStr);
     fetchTakenTimes(state.dateStr).then(function () {
       if (editExcludeTime) {
         takenTimes = takenTimes.filter(function (t) { return t !== editExcludeTime; });
@@ -350,7 +347,7 @@ function initSchedule() {
       return;
     }
     err.classList.add("hidden");
-    document.getElementById("final-date-display").textContent = state.dateStr;
+    document.getElementById("final-date-display").textContent = formatAppDate(state.dateStr);
     var parts = state.hour.split(":");
     var h = parseInt(parts[0], 10);
     var ampm = h >= 12 ? "pm" : "am";
@@ -488,6 +485,7 @@ function initSchedule() {
         form.plate.value = a.plate;
         editExcludeDate = a.appointment_date;
         editExcludeTime = a.appointment_time.slice(0, 5);
+        editExcludeNumber = editNumber;
         state.dateStr = a.appointment_date;
         state.hour = a.appointment_time.slice(0, 5);
         addressInput.value = a.address || "";
@@ -542,7 +540,7 @@ function initStatus() {
     document.getElementById("r-name").textContent = a.first_name + " " + a.last_name;
     document.getElementById("r-phone").textContent = (a.country_code || "+506") + " " + a.phone;
     document.getElementById("r-plate").textContent = a.plate;
-    document.getElementById("r-date").textContent = a.appointment_date;
+    document.getElementById("r-date").textContent = formatAppDate(a.appointment_date);
     document.getElementById("r-time").textContent = to12h(a.appointment_time.slice(0, 5));
     document.getElementById("r-address").textContent = a.address;
     var statusEl = document.getElementById("r-status");
@@ -580,7 +578,7 @@ function initStatus() {
       refreshDisplay(res);
       card.classList.remove("hidden");
     } catch (err) {
-      if (err.status === 404) showError(form, t("not_found"));
+      if (err.status === 404) showMessage(t("not_found"));
       else showError(form, err.message || t("error_generic"));
     }
   });
