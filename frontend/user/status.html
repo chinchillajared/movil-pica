@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" data-locale-base="/locales">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="form_title_status">Check your appointment status</title>
+    <link rel="stylesheet" href="/shared/styles.css" />
+  </head>
+  <body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
+    <header class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
+      <div class="flex items-center gap-3">
+        <img src="/images/logo.png" alt="" class="h-8 w-auto" />
+        <a href="/user/" class="text-sm text-slate-500 hover:text-slate-800" data-i18n="nav_home">Home</a>
+      </div>
+      <div class="flex items-center gap-2">
+        <div data-auth-ui class="flex items-center gap-2"></div>
+      </div>
+    </header>
+
+    <div id="announcement-banner" class="hidden"></div>
+
+    <main class="flex-1 p-6 flex items-start justify-center">
+      <section class="card w-full max-w-xl">
+        <h1 class="text-2xl font-bold mb-6" data-i18n="form_title_status">Check your appointment status</h1>
+
+        <form id="status-form" class="flex flex-col gap-4">
+          <div>
+            <label for="phone" class="block text-sm font-medium text-slate-700 mb-1" data-i18n="label_phone">Phone</label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              required
+              class="field-input flex-1"
+              data-i18n-placeholder="placeholder_phone"
+            />
+          </div>
+          <div>
+            <label for="plate" class="block text-sm font-medium text-slate-700 mb-1" data-i18n="label_plate">Plate number</label>
+            <input
+              id="plate"
+              name="plate"
+              type="text"
+              required
+              class="field-input flex-1 uppercase"
+              data-i18n-placeholder="placeholder_plate"
+            />
+          </div>
+          <button type="submit" class="btn-primary self-center" data-i18n="btn_check">Check</button>
+        </form>
+
+        <div id="form-error" class="hidden mt-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3"></div>
+
+        <div id="result-card" class="hidden mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
+          <h2 class="text-lg font-semibold mb-3" data-i18n="found_title">Appointment details</h2>
+          <dl class="grid grid-cols-3 gap-y-2 text-sm">
+            <dt class="text-slate-500" data-i18n="label_appointment_number">Appointment number</dt>
+            <dd id="r-number" class="col-span-2 font-mono"></dd>
+
+            <dt class="text-slate-500" data-i18n="field_name">Name</dt>
+            <dd id="r-name" class="col-span-2" data-field="name"></dd>
+
+            <dt class="text-slate-500" data-i18n="label_phone">Phone</dt>
+            <dd id="r-phone" class="col-span-2" data-field="phone"></dd>
+
+            <dt class="text-slate-500" data-i18n="label_plate">Plate number</dt>
+            <dd id="r-plate" class="col-span-2" data-field="plate"></dd>
+
+            <dt class="text-slate-500" data-i18n="field_date">Date</dt>
+            <dd id="r-date" class="col-span-2" data-field="date"></dd>
+
+            <dt class="text-slate-500" data-i18n="field_time">Time</dt>
+            <dd id="r-time" class="col-span-2" data-field="time"></dd>
+
+            <dt class="text-slate-500" data-i18n="field_address">Address</dt>
+            <dd id="r-address" class="col-span-2" data-field="address"></dd>
+
+            <dt class="text-slate-500" data-i18n="field_status">Status</dt>
+            <dd id="r-status" class="col-span-2"></dd>
+          </dl>
+
+          <div id="status-actions" class="hidden flex flex-wrap gap-3 mt-6 pt-4 border-t border-slate-200">
+            <button id="btn-cancel-appt" type="button" class="btn-secondary"></button>
+            <button id="btn-edit-appt" type="button" class="btn-primary"></button>
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <a href="/user/" class="btn-secondary" data-i18n="btn_back">Back</a>
+        </div>
+      </section>
+    </main>
+
+    <script src="/shared/i18n.js"></script>
+    <script src="/shared/api.js"></script>
+    <script src="/shared/auth.js"></script>
+    <script src="/user/app.js"></script>
+    <script>window.PAGE = "status";</script>
+  </body>
+</html>

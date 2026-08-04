@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en" data-locale-base="/locales">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="mechanic_panel">Mechanic panel</title>
+    <link rel="stylesheet" href="/shared/styles.css" />
+  </head>
+  <body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
+    <header class="px-4 sm:px-6 py-4 border-b border-slate-200 bg-white">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <img src="/images/logo.png" alt="" class="h-8 w-auto" />
+          <h1 class="text-xl font-bold text-slate-900" data-i18n="mechanic_panel">Mechanic panel</h1>
+          <button id="back-home-btn" type="button" class="btn-secondary hidden" data-i18n="btn_back">Volver</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <div id="account-menu" class="relative">
+            <button id="account-gear" type="button" class="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50" aria-label="Settings">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+            <div id="account-dropdown" class="hidden absolute right-0 top-full mt-1 bg-white rounded-xl border border-slate-200 shadow-lg py-1 min-w-[220px] z-50">
+              <p id="account-menu-user" class="px-4 py-2 text-sm font-semibold text-slate-800"></p>
+              <div class="px-4 py-2 border-b border-slate-100">
+                <p class="text-xs uppercase tracking-wide text-slate-400 mb-1" data-i18n="language">Idioma</p>
+                <div data-lang-switcher class="flex items-center gap-1"></div>
+              </div>
+              <button type="button" id="account-menu-account" class="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50" data-i18n="client_my_account">Mi cuenta</button>
+              <button type="button" id="account-menu-logout" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50" data-i18n="client_logout">Cerrar sesión</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 p-4 sm:p-6 max-w-6xl w-full mx-auto flex flex-col items-center justify-start">
+
+      <!-- ===== LANDING (two big buttons) ===== -->
+      <div id="view-landing" class="grid grid-cols-1 sm:grid-cols-3 gap-8 w-full max-w-4xl justify-items-center">
+        <button id="landing-calendar" class="btn-square">
+          <span class="icon" aria-hidden="true">&#128197;</span>
+          <span class="text-lg" data-i18n="mechanic_view_calendar">Calendario de citas</span>
+        </button>
+        <button id="landing-announce" class="btn-square">
+          <span class="icon" aria-hidden="true">&#128240;</span>
+          <span class="text-lg" data-i18n="mechanic_view_announcements">Anuncios</span>
+        </button>
+        <a href="/mechanic/create.html" class="btn-square">
+          <span class="icon" aria-hidden="true">&#10133;</span>
+          <span class="text-lg" data-i18n="mechanic_create">New appointment</span>
+        </a>
+        <button id="landing-clients" class="btn-square">
+          <span class="icon" aria-hidden="true">&#128101;</span>
+          <span class="text-lg" data-i18n="mechanic_view_clients">Clientes</span>
+        </button>
+        <button id="landing-users" class="btn-square hidden">
+          <span class="icon" aria-hidden="true">&#128295;</span>
+          <span class="text-lg" data-i18n="mechanic_view_users">Usuarios</span>
+        </button>
+        <button id="landing-vehicles" class="btn-square">
+          <span class="icon" aria-hidden="true">&#128663;</span>
+          <span class="text-lg" data-i18n="mechanic_view_vehicles">Historial de Vehículos</span>
+        </button>
+        <button id="landing-settings" class="btn-square">
+          <span class="icon" aria-hidden="true">&#9881;</span>
+          <span class="text-lg" data-i18n="mechanic_view_settings">Configuración</span>
+        </button>
+      </div>
+
+      <!-- ===== CALENDAR VIEW ===== -->
+      <div id="view-calendar" class="hidden w-full">
+        <section class="card">
+          <div class="flex flex-wrap gap-4 mb-4 text-sm">
+            <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full bg-yellow-400"></span> <span data-i18n="status_pending">Pendiente</span></span>
+            <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full bg-blue-500"></span> <span data-i18n="status_confirmed">Confirmada</span></span>
+            <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full bg-green-500"></span> <span data-i18n="status_completed">Completada</span></span>
+            <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full bg-red-500"></span> <span data-i18n="status_cancelled">Cancelada</span></span>
+          </div>
+          <div class="flex items-center justify-between mb-4">
+            <button id="cal-prev" class="btn-secondary px-3 py-1">&larr;</button>
+            <span id="cal-month-year" class="text-lg font-semibold"></span>
+            <button id="cal-next" class="btn-secondary px-3 py-1">&rarr;</button>
+          </div>
+          <div id="cal-grid" class="grid grid-cols-7 gap-1 text-center"></div>
+          <div id="cal-selected" class="hidden mt-4 pt-4 border-t border-slate-200">
+            <p id="cal-selected-date" class="font-semibold mb-2"></p>
+            <div id="cal-appt-card" class="hidden">
+              <div id="cal-appt-details" class="text-sm space-y-1 mb-3"></div>
+            </div>
+            <p id="cal-no-appt" class="hidden text-slate-500 text-sm" data-i18n="mechanic_empty">No appointments to show.</p>
+          </div>
+          <button id="cal-back-btn" type="button" class="btn-secondary mt-6" data-i18n="btn_back">Volver</button>
+        </section>
+      </div>
+
+      <!-- ===== ANNOUNCEMENTS VIEW ===== -->
+      <div id="view-announce" class="hidden w-full">
+        <section class="card">
+          <form id="announce-form" class="flex flex-col gap-4 mb-6 pb-6 border-b border-slate-200">
+            <h2 class="text-lg font-semibold" data-i18n="announce_new_title">Nuevo anuncio</h2>
+            <p class="text-sm text-slate-500" data-i18n="announce_explainer">Los anuncios son mensajes informativos que se muestran en la parte superior de la página del cliente. Puedes tener varios activos a la vez y aparecerán uno debajo del otro.</p>
+            <div>
+              <label class="field-label" for="announce-text" data-i18n="announce_text">Texto del anuncio</label>
+              <textarea id="announce-text" class="field-input" rows="3" maxlength="500" required></textarea>
+            </div>
+            <div>
+              <label class="field-label" data-i18n="announce_color">Color de fondo</label>
+              <div id="announce-colors" class="flex flex-wrap gap-2">
+                <button type="button" class="w-8 h-8 rounded-full border-2 border-amber-400" style="background:#fde68a" data-color="#fde68a" title="Ámbar"></button>
+                <button type="button" class="w-8 h-8 rounded-full border-2 border-transparent" style="background:#bae6fd" data-color="#bae6fd" title="Celeste"></button>
+                <button type="button" class="w-8 h-8 rounded-full border-2 border-transparent" style="background:#bbf7d0" data-color="#bbf7d0" title="Verde"></button>
+                <button type="button" class="w-8 h-8 rounded-full border-2 border-transparent" style="background:#fed7aa" data-color="#fed7aa" title="Naranja"></button>
+                <button type="button" class="w-8 h-8 rounded-full border-2 border-transparent" style="background:#fbcfe8" data-color="#fbcfe8" title="Rosa"></button>
+                <button type="button" class="w-8 h-8 rounded-full border-2 border-transparent" style="background:#ddd6fe" data-color="#ddd6fe" title="Púrpura"></button>
+                <button type="button" class="w-8 h-8 rounded-full border-2 border-transparent" style="background:#a5f3fc" data-color="#a5f3fc" title="Cian"></button>
+                <button type="button" class="w-8 h-8 rounded-full border-2 border-transparent" style="background:#e2e8f0" data-color="#e2e8f0" title="Gris"></button>
+              </div>
+            </div>
+            <div>
+              <label class="field-label" data-i18n="announce_duration_mode">Duración</label>
+              <div class="inline-flex rounded-lg bg-slate-100 p-1">
+                <button id="announce-mode-hours" type="button" class="px-5 py-2 text-sm font-semibold rounded-md bg-white text-brand-700 shadow-sm" data-i18n="announce_duration_hours">Horas</button>
+                <button id="announce-mode-permanent" type="button" class="px-5 py-2 text-sm font-semibold rounded-md text-slate-600 hover:text-slate-800" data-i18n="announce_duration_permanent">Sin límite</button>
+              </div>
+            </div>
+            <div id="announce-hours-wrap">
+              <label class="field-label" for="announce-duration" data-i18n="announce_duration">Duración (horas)</label>
+              <input id="announce-duration" type="number" class="field-input" value="24" min="1" max="720" />
+            </div>
+            <div class="flex gap-2">
+              <button id="announce-save-btn" type="submit" class="btn-primary" data-i18n="announce_save">Guardar</button>
+              <button id="announce-cancel-edit" type="button" class="btn-secondary hidden" data-i18n="announce_cancel_edit">Cancelar edición</button>
+            </div>
+            <div id="announce-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3"></div>
+          </form>
+          <div>
+            <h3 class="text-md font-semibold mb-3" data-i18n="announce_history">Historial de anuncios</h3>
+            <div id="announce-list" class="space-y-3"></div>
+            <p id="announce-empty" class="text-center text-slate-500 py-4" data-i18n="announce_no_announcements">No hay anuncios.</p>
+          </div>
+          <button id="announce-back-btn" type="button" class="btn-secondary mt-6" data-i18n="btn_back">Volver</button>
+        </section>
+      </div>
+
+      <!-- ===== SETTINGS VIEW ===== -->
+      <div id="view-settings" class="hidden w-full">
+        <section class="card">
+          <h2 class="text-xl font-bold mb-1 text-center" data-i18n="settings_title">Configuración general</h2>
+          <p class="text-slate-500 mb-6 text-center text-sm" data-i18n="settings_subtitle">Administra los horarios y opciones del sistema</p>
+
+          <!-- Tabs -->
+          <div id="settings-tabs" class="flex gap-2 mb-6 border-b border-slate-200">
+            <button id="settings-tab-schedule" type="button" class="px-4 py-2 text-sm font-semibold border-b-2 border-brand-600 text-brand-700" data-tab="schedule" data-i18n="settings_tab_schedule">Horario</button>
+            <button id="settings-tab-appttime" type="button" class="px-4 py-2 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700" data-tab="appttime" data-i18n="settings_tab_appttime">Tiempo de citas</button>
+            <button id="settings-tab-integrations" type="button" class="px-4 py-2 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700" data-tab="integrations" data-i18n="settings_tab_integrations">Integraciones</button>
+          </div>
+
+          <!-- TAB: Schedule -->
+          <div id="settings-panel-schedule">
+            <div class="flex justify-center mb-6">
+              <div class="inline-flex rounded-lg bg-slate-100 p-1">
+                <button id="schedule-tab-workdays" type="button" class="schedule-tab-btn px-5 py-2 text-sm font-semibold rounded-md bg-white text-brand-700 shadow-sm" data-schedule-section="workdays" data-i18n="settings_work_days">Días de trabajo</button>
+                <button id="schedule-tab-daysoff" type="button" class="schedule-tab-btn px-5 py-2 text-sm font-semibold rounded-md text-slate-600 hover:text-slate-800" data-schedule-section="daysoff" data-i18n="settings_days_off">Días libres</button>
+              </div>
+            </div>
+
+            <div id="schedule-section-workdays">
+              <h3 class="text-lg font-semibold text-center mb-1" data-i18n="settings_work_days">Días de trabajo</h3>
+              <p class="text-slate-500 text-center text-sm mb-4" data-i18n="settings_work_days_subtitle">Activa cada día y define su horario individual</p>
+              <div id="settings-days" class="space-y-3 mb-4"></div>
+              <div id="settings-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3 mb-4"></div>
+              <div id="settings-success" class="hidden rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm p-3 mb-4"></div>
+              <div class="flex justify-end mt-6">
+                <button id="settings-save" type="button" class="btn-primary" data-i18n="settings_save">Guardar configuración</button>
+              </div>
+            </div>
+
+            <div id="schedule-section-daysoff" class="hidden">
+              <h3 class="text-lg font-semibold text-center mb-1" data-i18n="settings_days_off">Días libres</h3>
+              <p class="text-slate-500 text-center text-sm mb-4" data-i18n="settings_days_off_subtitle">Fechas en las que no habrá servicio</p>
+              <div class="flex flex-col sm:flex-row gap-2 mb-3">
+                <div class="flex items-center gap-2 sm:flex-1 flex-wrap">
+                  <span class="text-sm text-slate-600 font-medium" data-i18n="settings_days_off_choose_label">Elige el día</span>
+                  <svg class="text-slate-400 shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                  <button id="day-off-picker" type="button" class="px-4 py-2.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 shrink-0" title="Elegir fecha" aria-label="Elegir fecha" data-i18n-title="settings_days_off_pick" data-i18n-aria="settings_days_off_pick">
+                    <svg class="block" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  </button>
+                  <span id="day-off-selected" class="text-sm text-slate-700 font-medium"></span>
+                </div>
+                <input id="day-off-reason" type="text" class="field-input sm:flex-1" placeholder="Motivo (opcional)" data-i18n-placeholder="settings_days_off_reason_ph" />
+                <button id="day-off-add" type="button" class="btn-secondary" data-i18n="settings_days_off_add">Agregar día libre</button>
+              </div>
+              <div id="days-off-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3 mb-3"></div>
+              <ul id="days-off-list" class="space-y-2"></ul>
+            </div>
+          </div>
+
+          <!-- TAB: Appointment time -->
+          <div id="settings-panel-appttime" class="hidden">
+            <h3 class="text-lg font-semibold text-center mb-1" data-i18n="appttime_title">Tiempo de citas</h3>
+            <p class="text-slate-500 text-center text-sm mb-6" data-i18n="appttime_subtitle">Define cuánto tiempo reserva cada cita</p>
+            <div class="max-w-md mx-auto">
+              <div class="mb-4">
+                <label class="field-label" data-i18n="appttime_unit">Unidad</label>
+                <div id="appttime-unit" class="flex gap-2" role="group" aria-label="Unidad">
+                  <button type="button" data-unit="hours" data-i18n="appttime_unit_hours">Horas</button>
+                  <button type="button" data-unit="days" data-i18n="appttime_unit_days">Días</button>
+                </div>
+              </div>
+              <div class="mb-4">
+                <label class="field-label" data-i18n="appttime_value">Tiempo reservado</label>
+                <div id="appttime-value" class="flex flex-wrap gap-2" role="group" aria-label="Tiempo reservado"></div>
+              </div>
+              <p id="appttime-hint" class="text-sm text-slate-500 mb-4"></p>
+              <div id="appttime-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3 mb-4"></div>
+              <div id="appttime-success" class="hidden rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm p-3 mb-4"></div>
+              <div class="flex justify-end mt-6">
+                <button id="appttime-save" type="button" class="btn-primary" data-i18n="appttime_save">Guardar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: Integrations -->
+          <div id="settings-panel-integrations" class="hidden">
+            <h3 class="text-lg font-semibold text-center mb-1" data-i18n="integrations_title">Integraciones</h3>
+            <p class="text-slate-500 text-center text-sm mb-6" data-i18n="integrations_subtitle">Conecta tus servicios externos</p>
+            <div class="grid sm:grid-cols-2 gap-4 max-w-xl mx-auto">
+              <div class="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-white">
+                <div class="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center shrink-0">
+                  <svg fill="#25D366" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="w-7 h-7"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold" data-i18n="integrations_whatsapp">WhatsApp</div>
+                  <p class="text-sm text-slate-500" data-i18n="integrations_whatsapp_desc">Mensajería y notificaciones</p>
+                </div>
+                <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1 shrink-0" data-i18n="integrations_soon">Próximamente</span>
+              </div>
+              <div id="gmail-card" class="p-4 rounded-xl border border-slate-200 bg-white">
+                <div class="flex items-start gap-3">
+                  <div class="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                    <svg fill="#EA4335" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" class="w-7 h-7"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-semibold" data-i18n="integrations_gmail">Gmail</div>
+                    <p class="text-sm text-slate-500" data-i18n="integrations_gmail_desc">Correo electrónico</p>
+                  </div>
+                </div>
+                <div id="gmail-status" class="mt-4"></div>
+              </div>
+            </div>
+
+            <div id="gmail-form" class="hidden max-w-xl mx-auto mt-4 p-5 rounded-xl border border-slate-200 bg-slate-50">
+              <div class="mb-3">
+                <label class="field-label" for="gmail-from" data-i18n="gmail_from_email">Cuenta de Gmail (remitente)</label>
+                <input id="gmail-from" type="email" class="field-input" placeholder="mecanico@gmail.com" />
+              </div>
+              <div class="mb-3">
+                <label class="field-label" for="gmail-client-id" data-i18n="gmail_client_id">Google OAuth Client ID</label>
+                <input id="gmail-client-id" type="text" class="field-input" placeholder="xxxx.apps.googleusercontent.com" />
+              </div>
+              <div class="mb-3">
+                <label class="field-label" for="gmail-client-secret" data-i18n="gmail_client_secret">Google OAuth Client Secret</label>
+                <input id="gmail-client-secret" type="password" class="field-input" autocomplete="off" />
+              </div>
+              <p class="text-xs text-slate-500 mb-3" data-i18n="gmail_redirect_hint">URI de redirección autorizada en Google Cloud:</p>
+              <p id="gmail-redirect-uri" class="text-xs font-mono text-slate-700 bg-white border border-slate-200 rounded-md px-2 py-1 mb-4"></p>
+              <div class="flex flex-wrap gap-2">
+                <button id="gmail-save-creds" type="button" class="btn-primary" data-i18n="gmail_save">Guardar credenciales</button>
+                <button id="gmail-authorize" type="button" class="btn-secondary hidden" data-i18n="gmail_authorize">Autorizar con Google</button>
+              </div>
+            </div>
+            <div id="gmail-msg" class="hidden max-w-xl mx-auto mt-4 rounded-lg border text-sm p-3"></div>
+          </div>
+
+          <button id="settings-back-btn" type="button" class="btn-secondary mt-8" data-i18n="btn_back">Volver</button>
+        </section>
+      </div>
+
+      <!-- ===== CLIENTS VIEW ===== -->
+      <div id="view-clients" class="hidden w-full">
+        <section class="card">
+          <h2 class="text-lg font-semibold mb-4" data-i18n="mechanic_view_clients">Clientes</h2>
+          <div class="mb-4">
+            <input id="clients-search" type="search" class="field-input" data-i18n-placeholder="clients_search_ph" placeholder="Buscar cliente por nombre, email o teléfono..." />
+          </div>
+          <div id="clients-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3 mb-4"></div>
+          <div id="clients-list" class="space-y-3"></div>
+          <p id="clients-empty" class="hidden text-center text-slate-500 py-6" data-i18n="clients_empty">No hay clientes registrados.</p>
+          <button id="clients-back-btn" type="button" class="btn-secondary mt-6" data-i18n="btn_back">Volver</button>
+        </section>
+      </div>
+
+      <!-- ===== USERS VIEW (admin) ===== -->
+      <div id="view-users" class="hidden w-full">
+        <section class="card">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <h2 class="text-lg font-semibold" data-i18n="mechanic_view_users">Usuarios</h2>
+            <div class="flex gap-2">
+              <button id="users-add-btn" type="button" class="btn-primary" data-i18n="users_add">Nuevo usuario</button>
+            </div>
+          </div>
+          <div id="users-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3 mb-4"></div>
+          <div id="users-list" class="space-y-3"></div>
+          <p id="users-empty" class="hidden text-center text-slate-500 py-6" data-i18n="users_empty">No hay usuarios.</p>
+          <button id="users-back-btn" type="button" class="btn-secondary mt-6" data-i18n="btn_back">Volver</button>
+        </section>
+      </div>
+
+      <!-- ===== VEHICLES VIEW (list) ===== -->
+      <div id="view-vehicles" class="hidden w-full">
+        <section class="card">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <h2 class="text-lg font-semibold" data-i18n="mechanic_view_vehicles">Historial de Vehículos</h2>
+            <button id="vehicles-add-btn" type="button" class="btn-primary" data-i18n="vehicles_add">Registrar vehículo</button>
+          </div>
+          <div class="mb-4">
+            <input id="vehicles-search" type="search" class="field-input" data-i18n-placeholder="vehicles_search_ph" placeholder="Buscar por placa, marca o modelo..." />
+          </div>
+          <div id="vehicles-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3 mb-4"></div>
+          <div id="vehicles-list" class="space-y-3"></div>
+          <p id="vehicles-empty" class="hidden text-center text-slate-500 py-6" data-i18n="vehicles_empty">No hay vehículos registrados.</p>
+          <button id="vehicles-back-btn" type="button" class="btn-secondary mt-6" data-i18n="btn_back">Volver</button>
+        </section>
+      </div>
+
+      <!-- ===== VEHICLE DETAIL VIEW ===== -->
+      <div id="view-vehicle-detail" class="hidden w-full">
+        <section class="card">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 id="vehicle-detail-title" class="text-lg font-semibold"></h2>
+            <div class="flex flex-wrap gap-2">
+              <button id="vehicle-detail-edit" type="button" class="btn-secondary" data-i18n="vehicles_edit">Editar vehículo</button>
+              <button id="vehicle-detail-delete" type="button" class="btn-danger" data-i18n="vehicles_delete">Eliminar</button>
+            </div>
+          </div>
+          <div id="vehicle-detail-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3 mb-4"></div>
+          <div id="vehicle-detail-body" class="space-y-6"></div>
+          <div class="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+            <button id="vehicle-detail-back" type="button" class="btn-secondary" data-i18n="btn_back">Volver</button>
+            <button id="vehicle-detail-add-visit" type="button" class="btn-primary" data-i18n="visits_add">Nuevo registro de trabajo</button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script src="/shared/i18n.js?v=4"></script>
+    <script src="/shared/api.js?v=4"></script>
+    <script src="/mechanic/app.js?v=4"></script>
+    <script>window.PAGE = "dashboard";</script>
+  </body>
+</html>

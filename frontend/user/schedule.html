@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en" data-locale-base="/locales">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="form_title_schedule">Schedule your appointment</title>
+    <link rel="stylesheet" href="/shared/styles.css" />
+  </head>
+  <body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
+    <header class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-200 bg-white">
+      <div class="flex items-center gap-3">
+        <img src="/images/logo.png" alt="" class="h-8 w-auto" />
+        <a href="/user/" class="text-sm text-slate-500 hover:text-slate-800" data-i18n="nav_home">Home</a>
+      </div>
+      <div class="flex items-center gap-2">
+        <div data-auth-ui class="flex items-center gap-2"></div>
+      </div>
+    </header>
+
+    <div id="announcement-banner" class="hidden"></div>
+
+    <main class="flex-1 p-4 sm:p-6 flex items-start justify-center">
+      <section id="form-card" class="card w-full max-w-lg">
+
+        <!-- Step indicator -->
+        <div id="step-indicator" class="flex items-center justify-center gap-2 mb-6">
+          <span class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm bg-brand-600 text-white">1</span>
+          <span class="h-1 w-8 rounded-full bg-brand-600"></span>
+          <span class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm bg-slate-200 text-slate-600">2</span>
+          <span class="h-1 w-8 rounded-full bg-slate-200"></span>
+          <span class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm bg-slate-200 text-slate-600">3</span>
+        </div>
+
+        <!-- STEP 1: Calendar -->
+        <div id="step-1">
+          <h2 class="text-xl font-bold mb-1 text-center" data-i18n="step_calendar_title">Select a date</h2>
+          <p class="text-slate-500 mb-4 text-center text-sm" data-i18n="step_calendar_subtitle">Pick a date from the calendar</p>
+
+          <div id="calendar-widget" class="select-none">
+            <div class="flex items-center justify-between mb-3">
+              <button id="cal-prev" type="button" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-100 text-2xl font-bold text-slate-600 transition">&lsaquo;</button>
+              <span id="cal-month-year" class="font-bold text-lg text-slate-800 capitalize"></span>
+              <button id="cal-next" type="button" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-100 text-2xl font-bold text-slate-600 transition">&rsaquo;</button>
+            </div>
+            <div id="cal-day-headers" class="grid grid-cols-7 text-center mb-1"></div>
+            <div id="cal-days" class="grid grid-cols-7 text-center gap-1.5"></div>
+
+            <!-- Calendar legend -->
+            <div class="flex items-center justify-center gap-2 mt-3 text-xs text-slate-600">
+              <span class="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-green-50 border border-green-200">
+                <span data-i18n="legend_available">Fechas disponibles</span>
+              </span>
+            </div>
+          </div>
+
+          <p id="step1-error" class="hidden text-sm text-red-600 mt-3 text-center"></p>
+
+          <div class="flex justify-between mt-6">
+            <a href="/user/" class="btn-secondary" data-i18n="btn_back">Back</a>
+            <button id="step1-next" class="btn-primary" data-i18n="btn_next">Next</button>
+          </div>
+        </div>
+
+        <!-- STEP 2: Time -->
+        <div id="step-2" class="hidden">
+          <h2 class="text-xl font-bold mb-1 text-center" data-i18n="step_time_title">Select a time</h2>
+          <p class="text-slate-500 mb-2 text-center text-sm" data-i18n="step_time_subtitle">Pick an available hour</p>
+          <p class="text-xs text-slate-600 text-center mb-4 font-semibold"><span id="step2-date-display"></span></p>
+
+          <div id="hour-grid" class="grid grid-cols-3 gap-3"></div>
+          <p id="step2-error" class="hidden text-sm text-red-600 mt-3 text-center"></p>
+
+          <div class="flex justify-between mt-6">
+            <button id="step2-back" type="button" class="btn-secondary" data-i18n="btn_back">Back</button>
+            <button id="step2-next" type="button" class="btn-primary" data-i18n="btn_next">Next</button>
+          </div>
+        </div>
+
+        <!-- STEP 3: Details -->
+        <div id="step-3" class="hidden">
+          <h2 class="text-xl font-bold mb-1 text-center" data-i18n="step_details_title">Your details</h2>
+          <p class="text-slate-500 mb-1 text-center text-sm" data-i18n="step_details_subtitle">Enter your information to confirm</p>
+          <p class="text-center text-sm text-slate-700 font-medium mb-4">
+            <span id="final-date-display"></span> &middot; <span id="final-time-display"></span>
+          </p>
+
+          <form id="schedule-form" novalidate class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="field-label" for="first_name" data-i18n="label_first_name">First name</label>
+                <input id="first_name" name="first_name" type="text" required class="field-input" data-i18n-placeholder="placeholder_first_name" />
+                <p class="text-xs text-red-600 mt-1 hidden" data-error-for="first_name"></p>
+              </div>
+              <div>
+                <label class="field-label" for="last_name" data-i18n="label_last_name">Last name</label>
+                <input id="last_name" name="last_name" type="text" required class="field-input" data-i18n-placeholder="placeholder_last_name" />
+                <p class="text-xs text-red-600 mt-1 hidden" data-error-for="last_name"></p>
+              </div>
+            </div>
+            <div>
+              <label class="field-label" data-i18n="label_phone">Phone</label>
+              <div class="flex rounded-lg border border-slate-300 focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500">
+                <div class="relative">
+                  <button id="phone-code-btn" type="button" class="flex items-center gap-0.5 h-full px-2 py-2 text-sm font-medium bg-white hover:bg-slate-50 border-r border-slate-300 rounded-l-lg focus:outline-none whitespace-nowrap" data-value="+506">🇨🇷 +506 <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></button>
+                  <div id="phone-code-dropdown" class="hidden absolute z-10 mt-0.5 left-0 w-36 rounded-lg border border-slate-200 bg-white shadow-lg overflow-hidden">
+                    <button type="button" class="code-option flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-slate-100 text-left" data-value="+506">🇨🇷 +506</button>
+                    <button type="button" class="code-option flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-slate-100 text-left" data-value="+1">🇺🇸 +1</button>
+                  </div>
+                </div>
+                <input id="phone" name="phone" type="tel" required class="flex-1 border-0 px-3 py-2 text-sm rounded-r-lg focus:outline-none focus:ring-0" data-i18n-placeholder="placeholder_phone" />
+              </div>
+              <p class="text-xs text-red-600 mt-1 hidden" data-error-for="phone"></p>
+            </div>
+            <div>
+              <label class="field-label" for="email" data-i18n="label_email">Email</label>
+              <input id="email" name="email" type="email" class="field-input" data-i18n-placeholder="placeholder_email" />
+              <p class="text-xs text-red-600 mt-1 hidden" data-error-for="email"></p>
+            </div>
+            <div>
+              <label class="field-label" for="plate" data-i18n="label_plate">Plate number</label>
+              <input id="plate" name="plate" type="text" required class="field-input uppercase" data-i18n-placeholder="placeholder_plate" />
+              <p class="text-xs text-red-600 mt-1 hidden" data-error-for="plate"></p>
+            </div>
+            <div>
+              <label class="field-label" for="address" data-i18n="label_address">Address</label>
+              <input id="address" name="address" type="text" class="field-input" data-i18n-placeholder="placeholder_address" />
+              <button id="share-location" type="button" class="btn-secondary w-full flex items-center justify-center gap-2 mt-2" data-i18n="btn_share_location">
+                <span aria-hidden="true">&#128205;</span> Share current location
+              </button>
+              <p id="location-status" class="text-xs text-slate-500 mt-1 hidden text-center"></p>
+              <a id="maps-link" href="#" target="_blank" rel="noopener" class="hidden mt-2 text-sm text-brand-700 font-medium hover:underline inline-flex items-center gap-1">
+                <span aria-hidden="true">&#128506;</span> <span data-i18n="btn_view_location">View on Google Maps</span>
+              </a>
+            </div>
+          </form>
+
+          <div id="form-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3 mt-4"></div>
+
+          <div class="flex justify-between mt-6">
+            <button id="step3-back" type="button" class="btn-secondary" data-i18n="btn_back">Back</button>
+            <button type="submit" form="schedule-form" class="btn-primary" data-i18n="btn_submit">Schedule</button>
+          </div>
+        </div>
+
+        <!-- Success -->
+        <div id="success-card" class="hidden text-center py-6">
+          <div class="text-5xl mb-3" aria-hidden="true">&#9989;</div>
+          <h2 class="text-2xl font-bold mb-2" data-i18n="success_title">Appointment booked!</h2>
+          <p class="text-slate-500 mb-2" data-i18n="success_message">We will contact you to confirm the appointment and location.</p>
+          <div class="inline-block rounded-xl border-2 border-brand-500 px-6 py-3 mb-6 space-y-2">
+            <div>
+              <div class="text-xs uppercase text-slate-500" data-i18n="your_number">Appointment number</div>
+              <div id="appt-number" class="text-lg font-mono font-bold text-brand-700 tracking-wider"></div>
+            </div>
+            <div>
+              <div class="text-xs uppercase text-slate-500" data-i18n="label_plate">Plate number</div>
+              <div id="appt-plate" class="text-lg font-mono font-bold text-brand-700 tracking-wider"></div>
+            </div>
+          </div>
+          <div class="flex items-center justify-center gap-3">
+            <a href="/user/status.html" class="btn-secondary" data-i18n="btn_status">Check appointment status</a>
+            <a href="/user/" class="btn-primary" data-i18n="nav_home">Home</a>
+          </div>
+        </div>
+
+      </section>
+    </main>
+
+    <div id="loading-overlay" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+      <div class="bg-white rounded-2xl shadow-xl px-8 py-6 flex flex-col items-center gap-3">
+        <svg class="animate-spin h-8 w-8 text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <span class="text-sm text-slate-600 font-medium" data-i18n="saving">Saving appointment...</span>
+      </div>
+    </div>
+
+    <script src="/shared/i18n.js?v=2"></script>
+    <script src="/shared/api.js?v=2"></script>
+    <script src="/shared/auth.js?v=2"></script>
+    <script src="/user/app.js?v=2"></script>
+    <script>window.PAGE = "schedule";</script>
+  </body>
+</html>

@@ -1,0 +1,286 @@
+/* Client (public site) authentication UI.
+   Injects a compact login/account control into each [data-auth-ui] header slot:
+   - Logged in:  "Hola, Nombre" + gear icon
+   - Not logged: "Iniciar sesión/Registrarse" button + gear icon
+   The gear icon opens a dropdown with Language, My account, Sign out. */
+
+(function () {
+  var t = function (k) { return (window.I18N && window.I18N.t) ? window.I18N.t(k) : k; };
+
+  var GEAR_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+
+  function currentClient() { return getClientUser(); }
+
+  function isLoggedIn() { return !!getClientTokens().access && !!currentClient(); }
+
+  function gearButton(label) {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50";
+    btn.setAttribute("aria-label", label);
+    btn.innerHTML = GEAR_SVG;
+    return btn;
+  }
+
+  function buildGearMenu(host, loggedIn) {
+    var wrap = document.createElement("div");
+    wrap.className = "relative";
+
+    var gear = gearButton(t("language"));
+    var menu = document.createElement("div");
+    menu.className = "hidden absolute right-0 top-full mt-1 bg-white rounded-xl border border-slate-200 shadow-lg py-1 min-w-[220px] z-50";
+
+    var langBlock = document.createElement("div");
+    langBlock.className = "px-4 py-2 border-b border-slate-100";
+    var langLabel = document.createElement("p");
+    langLabel.className = "text-xs uppercase tracking-wide text-slate-400 mb-1";
+    langLabel.textContent = t("language");
+    var langSwitcher = document.createElement("div");
+    langSwitcher.setAttribute("data-lang-switcher", "");
+    langSwitcher.className = "flex items-center gap-1";
+    langBlock.appendChild(langLabel);
+    langBlock.appendChild(langSwitcher);
+    menu.appendChild(langBlock);
+
+    var account = document.createElement("button");
+    account.type = "button";
+    account.className = "w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50";
+    account.textContent = t("client_my_account");
+    account.addEventListener("click", function () {
+      closeMenu();
+      if (loggedIn) openAccountModal();
+      else openModal("login");
+    });
+    menu.appendChild(account);
+
+    if (loggedIn) {
+      var logout = document.createElement("button");
+      logout.type = "button";
+      logout.className = "w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50";
+      logout.textContent = t("client_logout");
+      logout.addEventListener("click", function () {
+        closeMenu();
+        clearClientSession();
+        render();
+      });
+      menu.appendChild(logout);
+    }
+
+    function closeMenu() {
+      menu.classList.add("hidden");
+      document.removeEventListener("click", outside);
+    }
+    function outside(e) {
+      if (!wrap.contains(e.target)) closeMenu();
+    }
+    gear.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var isHidden = menu.classList.contains("hidden");
+      menu.classList.toggle("hidden");
+      if (!isHidden) { document.removeEventListener("click", outside); return; }
+      if (window.I18N && window.I18N.buildSwitcher) window.I18N.buildSwitcher();
+      setTimeout(function () { document.addEventListener("click", outside); }, 0);
+    });
+
+    wrap.appendChild(gear);
+    wrap.appendChild(menu);
+    host.appendChild(wrap);
+  }
+
+  function openAccountModal() {
+    var c = currentClient();
+    var overlay = document.createElement("div");
+    overlay.className = "fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4";
+    overlay.innerHTML =
+      '<div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">' +
+        '<div class="flex items-center justify-between mb-4">' +
+          '<h2 class="text-xl font-bold" id="account-modal-title"></h2>' +
+          '<button type="button" id="account-modal-close" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>' +
+        '</div>' +
+        '<div id="account-modal-body"></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    document.getElementById("account-modal-title").textContent = t("client_my_account");
+
+    var body = overlay.querySelector("#account-modal-body");
+    var rows = [
+      { k: "label_first_name", v: c.first_name },
+      { k: "label_last_name", v: c.last_name },
+      { k: "client_email", v: c.email },
+      { k: "label_phone", v: (c.country_code || "+506") + " " + c.phone },
+    ];
+    rows.forEach(function (r) {
+      var p = document.createElement("p");
+      p.className = "mb-2 text-sm";
+      p.innerHTML = '<span class="text-slate-400">' + t(r.k) + ':</span> <span class="font-medium">' + escapeHtml(r.v) + '</span>';
+      body.appendChild(p);
+    });
+
+    overlay.querySelector("#account-modal-close").addEventListener("click", function () { overlay.remove(); });
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
+  }
+
+  function render() {
+    document.querySelectorAll("[data-auth-ui]").forEach(function (host) {
+      host.innerHTML = "";
+      var loggedIn = isLoggedIn();
+      if (loggedIn) {
+        var c = currentClient();
+        var hello = document.createElement("span");
+        hello.className = "text-sm text-slate-700 font-medium";
+        hello.textContent = t("client_hello") + ", " + c.first_name;
+        host.appendChild(hello);
+      } else {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "px-3 py-1.5 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700";
+        btn.textContent = t("client_login_register");
+        btn.addEventListener("click", function () { openModal("login"); });
+        host.appendChild(btn);
+      }
+      buildGearMenu(host, loggedIn);
+    });
+    if (window.I18N && window.I18N.buildSwitcher) window.I18N.buildSwitcher();
+  }
+
+  function field(id, type, labelKey, placeholderKey, required) {
+    var wrap = document.createElement("div");
+    wrap.className = "mb-3 text-left";
+    var label = document.createElement("label");
+    label.className = "field-label";
+    label.textContent = t(labelKey);
+    var input = document.createElement("input");
+    input.id = id;
+    input.type = type;
+    input.className = "field-input";
+    input.placeholder = t(placeholderKey);
+    input.required = required;
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    return wrap;
+  }
+
+  function openModal(mode) {
+    var overlay = document.createElement("div");
+    overlay.className = "fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4";
+    overlay.innerHTML =
+      '<div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">' +
+        '<div class="flex items-center justify-between mb-4">' +
+          '<h2 class="text-xl font-bold" id="auth-modal-title"></h2>' +
+          '<button type="button" id="auth-modal-close" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>' +
+        '</div>' +
+        '<div id="auth-modal-body"></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    var body = overlay.querySelector("#auth-modal-body");
+    var title = overlay.querySelector("#auth-modal-title");
+
+    function build(m) {
+      title.textContent = m === "login" ? t("client_login") : t("client_register");
+      body.innerHTML = "";
+      if (m === "register") {
+        body.appendChild(field("auth-first", "text", "label_first_name", "placeholder_first_name", true));
+        body.appendChild(field("auth-last", "text", "label_last_name", "placeholder_last_name", true));
+      }
+      body.appendChild(field("auth-email", "email", "client_email", "client_email", true));
+      if (m === "register") {
+        body.appendChild(field("auth-phone", "tel", "label_phone", "placeholder_phone", true));
+      }
+      body.appendChild(field("auth-pass", "password", "client_password", "client_password", true));
+
+      var err = document.createElement("div");
+      err.id = "auth-error";
+      err.className = "hidden mb-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3";
+      body.appendChild(err);
+
+      var submit = document.createElement("button");
+      submit.type = "button";
+      submit.className = "btn-primary w-full";
+      submit.textContent = m === "login" ? t("client_submit_login") : t("client_submit_register");
+      submit.addEventListener("click", function () { doSubmit(m, err); });
+      body.appendChild(submit);
+
+      var switchBtn = document.createElement("button");
+      switchBtn.type = "button";
+      switchBtn.className = "mt-3 w-full text-sm text-brand-700 hover:underline";
+      switchBtn.textContent = m === "login" ? t("client_switch_register") : t("client_switch_login");
+      switchBtn.addEventListener("click", function () { build(m === "login" ? "register" : "login"); });
+      body.appendChild(switchBtn);
+    }
+
+    function showErr(el, msg) {
+      el.textContent = msg;
+      el.classList.remove("hidden");
+    }
+
+    function doSubmit(m, err) {
+      err.classList.add("hidden");
+      var email = document.getElementById("auth-email").value.trim();
+      var pass = document.getElementById("auth-pass").value;
+      if (!isValidEmail(email)) { showErr(err, t("client_invalid_email")); return; }
+      if (m === "register") {
+        var payload = {
+          first_name: document.getElementById("auth-first").value.trim(),
+          last_name: document.getElementById("auth-last").value.trim(),
+          email: email,
+          phone: document.getElementById("auth-phone").value.trim(),
+          country_code: "+506",
+          password: pass,
+        };
+        window.API.auth.register(payload).then(handleAuth).catch(function (e) { showErr(err, e.message || t("error_generic")); });
+      } else {
+        window.API.auth.login({ email: email, password: pass }).then(handleAuth).catch(function (e) {
+          if (e.status === 401) showErr(err, t("client_invalid_credentials"));
+          else showErr(err, e.message || t("error_generic"));
+        });
+      }
+    }
+
+    function handleAuth(data) {
+      setClientTokens(data);
+      setClientUser(data.client);
+      overlay.remove();
+      render();
+      prefillForm();
+    }
+
+    overlay.querySelector("#auth-modal-close").addEventListener("click", function () { overlay.remove(); });
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
+    build(mode);
+  }
+
+  function prefillForm() {
+    var c = currentClient();
+    if (!c) return;
+    var map = { first_name: c.first_name, last_name: c.last_name, phone: c.phone };
+    Object.keys(map).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && !el.value) el.value = map[id];
+    });
+    var emailEl = document.getElementById("email");
+    if (emailEl && !emailEl.value && c.email) emailEl.value = c.email;
+  }
+
+  function tryRefresh() {
+    var tokens = getClientTokens();
+    if (!tokens.refresh) return Promise.resolve(false);
+    return window.API.auth.refresh(tokens.refresh).then(function (res) {
+      setClientTokens({ access_token: res.access_token });
+      return true;
+    }).catch(function () { return false; });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function isValidEmail(v) {
+    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
+  }
+
+  document.addEventListener("i18n:ready", render);
+  window.ClientAuth = { render: render, prefillForm: prefillForm, tryRefresh: tryRefresh, isLoggedIn: isLoggedIn, currentClient: currentClient };
+})();

@@ -1,0 +1,75 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mechanic_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mechanic}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-appointments}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    networks:
+      - mechanic_net
+
+  pgadmin:
+    image: dpage/pgadmin4:9.1
+    container_name: mechanic_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@local.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-changeme}
+      PGADMIN_LISTEN_PORT: 80
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "${PGADMIN_PORT:-8080}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - mechanic_net
+
+  backend:
+    build: ./backend
+    container_name: mechanic_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-mechanic}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-appointments}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8081,http://localhost:8080}
+      EMAIL_ADDRESS: ${EMAIL_ADDRESS}
+      EMAILAPP_PASSWORD: ${EMAILAPP_PASSWORD}
+      SITE_URL: ${SITE_URL:-http://localhost:8081}
+      JWT_SECRET: ${JWT_SECRET:-changeme-secret-key}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+    networks:
+      - mechanic_net
+
+  frontend:
+    build: ./frontend
+    container_name: mechanic_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8081}:80"
+    depends_on:
+      - backend
+    networks:
+      - mechanic_net
+
+networks:
+  mechanic_net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  pgadmin_data:
