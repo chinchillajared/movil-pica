@@ -9,7 +9,7 @@
   <body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
     <header class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
       <div class="flex items-center gap-3">
-        <img src="/images/logo.png" alt="" class="h-8 w-auto" />
+        <img data-site-logo alt="" class="hidden h-8 w-auto" />
         <a href="/user/" class="text-sm text-slate-500 hover:text-slate-800" data-i18n="nav_home">Home</a>
       </div>
       <div data-lang-switcher class="flex items-center gap-1"></div>
@@ -43,6 +43,15 @@
 
         <label class="field-label" for="setup-password" data-i18n="mechanic_password">Password</label>
         <input id="setup-password" name="password" type="password" required class="field-input mb-4" autocomplete="new-password" minlength="8" />
+
+        <div class="mb-4">
+          <label class="field-label" data-i18n="setup_logo_label">Logo</label>
+          <div class="flex items-center gap-3">
+            <img id="setup-logo-preview" alt="" class="hidden h-14 w-auto object-contain rounded-lg border border-slate-200 bg-white p-1" />
+            <button id="setup-logo-btn" type="button" class="btn-secondary" data-i18n="setup_logo_upload">Subir logo</button>
+          </div>
+          <p class="text-xs text-slate-500 mt-1" data-i18n="setup_logo_hint">Opcional. Se mostrará en el encabezado del sitio.</p>
+        </div>
 
         <div id="setup-error" class="hidden mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3"></div>
 

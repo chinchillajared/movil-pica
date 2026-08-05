@@ -10,7 +10,7 @@
     <header class="px-4 sm:px-6 py-4 border-b border-slate-200 bg-white">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <img src="/images/logo.png" alt="" class="h-8 w-auto" />
+          <img data-site-logo alt="" class="hidden h-8 w-auto" />
           <h1 class="text-xl font-bold text-slate-900" data-i18n="mechanic_panel">Mechanic panel</h1>
           <button id="back-home-btn" type="button" class="btn-secondary hidden" data-i18n="btn_back">Volver</button>
         </div>
@@ -41,9 +41,9 @@
           <span class="icon" aria-hidden="true">&#128197;</span>
           <span class="text-lg" data-i18n="mechanic_view_calendar">Calendario de citas</span>
         </button>
-        <button id="landing-announce" class="btn-square">
-          <span class="icon" aria-hidden="true">&#128240;</span>
-          <span class="text-lg" data-i18n="mechanic_view_announcements">Anuncios</span>
+        <button id="landing-vehicles" class="btn-square">
+          <span class="icon" aria-hidden="true">&#128663;</span>
+          <span class="text-lg" data-i18n="mechanic_view_vehicles">Historial de Vehículos</span>
         </button>
         <a href="/mechanic/create.html" class="btn-square">
           <span class="icon" aria-hidden="true">&#10133;</span>
@@ -53,13 +53,13 @@
           <span class="icon" aria-hidden="true">&#128101;</span>
           <span class="text-lg" data-i18n="mechanic_view_clients">Clientes</span>
         </button>
+        <button id="landing-announce" class="btn-square">
+          <span class="icon" aria-hidden="true">&#128240;</span>
+          <span class="text-lg" data-i18n="mechanic_view_announcements">Anuncios</span>
+        </button>
         <button id="landing-users" class="btn-square hidden">
           <span class="icon" aria-hidden="true">&#128295;</span>
           <span class="text-lg" data-i18n="mechanic_view_users">Usuarios</span>
-        </button>
-        <button id="landing-vehicles" class="btn-square">
-          <span class="icon" aria-hidden="true">&#128663;</span>
-          <span class="text-lg" data-i18n="mechanic_view_vehicles">Historial de Vehículos</span>
         </button>
         <button id="landing-settings" class="btn-square">
           <span class="icon" aria-hidden="true">&#9881;</span>

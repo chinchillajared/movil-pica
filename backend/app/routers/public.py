@@ -13,6 +13,12 @@ from ..ratelimit import rate_limit
 router = APIRouter(prefix="/api", tags=["public"])
 
 
+@router.get("/site/settings")
+def get_site_settings(db: Session = Depends(get_db)):
+    obj = crud.get_site_settings(db)
+    return {"logo_data_url": obj.logo_data_url}
+
+
 @router.post(
     "/appointments",
     response_model=schemas.AppointmentCreateResponse,

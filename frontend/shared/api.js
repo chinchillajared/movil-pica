@@ -151,12 +151,16 @@ window.API = {
     updateAppointment: (number, payload) => api(`/api/appointments/${encodeURIComponent(number)}`, { method: "PUT", body: payload }),
     getActiveAnnouncements: () => api("/api/announcements/active"),
     getSchedule: () => api("/api/schedule"),
+    getSiteSettings: () => api("/api/site/settings"),
   },
   auth: {
     register: (payload) => api("/api/auth/register", { method: "POST", body: payload }),
     login: (payload) => api("/api/auth/login", { method: "POST", body: payload }),
     refresh: (refreshToken) => api("/api/auth/refresh", { method: "POST", body: { refresh_token: refreshToken } }),
     me: () => api("/api/auth/me", { headers: clientHeaders() }),
+    listVehicles: () => api("/api/auth/vehicles", { headers: clientHeaders() }),
+    createVehicle: (payload) => api("/api/auth/vehicles", { method: "POST", body: payload, headers: clientHeaders() }),
+    deleteVehicle: (id) => api(`/api/auth/vehicles/${id}`, { method: "DELETE", headers: clientHeaders() }),
   },
   mechanic: {
     bootstrapStatus: () => api("/api/mechanic/bootstrap"),
@@ -188,6 +192,12 @@ window.API = {
         body: { status },
         headers: mechanicHeaders(),
       }),
+    updateReservation: (number, payload) =>
+      api(`/api/mechanic/appointments/${encodeURIComponent(number)}/reservation`, {
+        method: "PUT",
+        body: payload,
+        headers: mechanicHeaders(),
+      }),
     remove: (number) =>
       api(`/api/mechanic/appointments/${encodeURIComponent(number)}`, {
         method: "DELETE",
@@ -205,6 +215,8 @@ window.API = {
     removeDayOff: (date) => api(`/api/mechanic/days-off/${encodeURIComponent(date)}`, { method: "DELETE", headers: mechanicHeaders() }),
     getAppointmentTime: () => api("/api/mechanic/appointment-time", { headers: mechanicHeaders() }),
     updateAppointmentTime: (payload) => api("/api/mechanic/appointment-time", { method: "PUT", body: payload, headers: mechanicHeaders() }),
+    getSiteSettings: () => api("/api/mechanic/settings/site", { headers: mechanicHeaders() }),
+    updateSiteSettings: (payload) => api("/api/mechanic/settings/site", { method: "PUT", body: payload, headers: mechanicHeaders() }),
     listVehicles: (q = "") =>
       api(`/api/mechanic/vehicles${q ? "?q=" + encodeURIComponent(q) : ""}`, { headers: mechanicHeaders() }),
     createVehicle: (payload) => api("/api/mechanic/vehicles", { method: "POST", body: payload, headers: mechanicHeaders() }),

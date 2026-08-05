@@ -79,6 +79,28 @@ function buildSwitcher(currentLang) {  if (currentLang === undefined && window.I
   });
 }
 
+async function applySiteLogo() {
+  const imgs = document.querySelectorAll("[data-site-logo]");
+  if (!imgs.length) return;
+  let logo = "";
+  try {
+    const res = await fetch("/api/site/settings", { cache: "no-cache" });
+    const data = await res.json();
+    logo = (data && data.logo_data_url) || "";
+  } catch (e) {
+    logo = "";
+  }
+  imgs.forEach((img) => {
+    if (logo) {
+      img.src = logo;
+      img.classList.remove("hidden");
+    } else {
+      img.removeAttribute("src");
+      img.classList.add("hidden");
+    }
+  });
+}
+
 window.I18N = {
   lang: null,
   dict: {},
@@ -102,4 +124,5 @@ window.I18N = {
 
 document.addEventListener("DOMContentLoaded", () => {
   window.I18N.init();
+  applySiteLogo();
 });

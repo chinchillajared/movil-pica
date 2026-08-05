@@ -62,6 +62,12 @@ def on_startup() -> None:
         )
         conn.execute(
             text(
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS reserved_dates JSON NOT NULL DEFAULT '[]'"
+            )
+        )
+        conn.execute(
+            text(
                 "UPDATE appointments SET country_code = '+506', phone = SUBSTRING(phone, 5) "
                 "WHERE phone LIKE '+506%' AND country_code = '+506'"
             )
@@ -141,8 +147,119 @@ def on_startup() -> None:
         )
         conn.execute(
             text(
+                "CREATE TABLE IF NOT EXISTS site_settings ("
+                "id INTEGER PRIMARY KEY, "
+                "logo_data_url TEXT NOT NULL DEFAULT '', "
+                "updated_at TIMESTAMPTZ DEFAULT NOW()"
+                ")"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO site_settings (id, logo_data_url) "
+                "VALUES (1, '') "
+                "ON CONFLICT (id) DO NOTHING"
+            )
+        )
+        conn.execute(
+            text(
                 "ALTER TABLE vehicles "
                 "ADD COLUMN IF NOT EXISTS front_photo TEXT NOT NULL DEFAULT ''"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE vehicles "
+                "ADD COLUMN IF NOT EXISTS plate_key VARCHAR(20) NOT NULL DEFAULT ''"
+            )
+        )
+        conn.execute(
+            text(
+                "UPDATE vehicles "
+                "SET plate_key = UPPER(regexp_replace(plate, '[^A-Za-z0-9]', '', 'g')) "
+                "WHERE plate_key = '' OR plate_key IS NULL"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS client_vehicles ("
+                "id SERIAL PRIMARY KEY, "
+                "client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE, "
+                "vehicle_id INTEGER NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE, "
+                "created_at TIMESTAMPTZ DEFAULT NOW(), "
+                "CONSTRAINT uq_client_vehicle UNIQUE (client_id, vehicle_id)"
+                ")"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_client_vehicles_vehicle_id "
+                "ON client_vehicles (vehicle_id)"
+            )
+        )
+        # migrate existing ownership from vehicles.client_id to client_vehicles
+        # (guarded: only when the legacy column still exists)
+        has_client_id = conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = 'vehicles' AND column_name = 'client_id'"
+            )
+        ).scalar_one_or_none()
+        if has_client_id:
+            conn.execute(
+                text(
+                    "INSERT INTO client_vehicles (client_id, vehicle_id) "
+                    "SELECT vehicles.client_id, vehicles.id FROM vehicles "
+                    "WHERE vehicles.client_id IS NOT NULL "
+                    "ON CONFLICT DO NOTHING"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE vehicles "
+                    "DROP COLUMN IF EXISTS client_id"
+                )
+            )
+        # dedupe vehicles by plate_key: reassign visits + ownership to master, delete dups
+        conn.execute(
+            text(
+                "UPDATE vehicle_visits vv "
+                "SET vehicle_id = v.master_id "
+                "FROM vehicles veh "
+                "JOIN (SELECT plate_key, MIN(id) AS master_id FROM vehicles "
+                "      GROUP BY plate_key HAVING COUNT(*) > 1) v ON veh.plate_key = v.plate_key "
+                "WHERE veh.id <> v.master_id AND vv.vehicle_id = veh.id"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO client_vehicles (client_id, vehicle_id) "
+                "SELECT DISTINCT cv.client_id, v.master_id "
+                "FROM client_vehicles cv "
+                "JOIN vehicles veh ON veh.id = cv.vehicle_id "
+                "JOIN (SELECT plate_key, MIN(id) AS master_id FROM vehicles "
+                "      GROUP BY plate_key HAVING COUNT(*) > 1) v ON veh.plate_key = v.plate_key "
+                "WHERE veh.id <> v.master_id "
+                "ON CONFLICT DO NOTHING"
+            )
+        )
+        conn.execute(
+            text(
+                "DELETE FROM vehicles veh "
+                "USING (SELECT plate_key, MIN(id) AS master_id FROM vehicles "
+                "       GROUP BY plate_key HAVING COUNT(*) > 1) v "
+                "WHERE veh.plate_key = v.plate_key AND veh.id <> v.master_id"
+            )
+        )
+        conn.execute(
+            text(
+                "DROP INDEX IF EXISTS ix_vehicles_plate"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_vehicles_plate_key "
+                "ON vehicles (plate_key)"
             )
         )
         conn.execute(

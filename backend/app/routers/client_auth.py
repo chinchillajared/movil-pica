@@ -84,3 +84,47 @@ def refresh(payload: schemas.RefreshRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=schemas.ClientOut)
 def me(client=Depends(require_client)):
     return schemas.ClientOut.model_validate(client)
+
+
+# --------------------------------------------------------------------------
+# Client vehicles (mis vehículos)
+# --------------------------------------------------------------------------
+@router.get("/vehicles", response_model=list[schemas.VehicleSummaryOut])
+def my_vehicles(client=Depends(require_client), db: Session = Depends(get_db)):
+    return crud.list_vehicles_by_client(db, client.id)
+
+
+@router.post(
+    "/vehicles",
+    response_model=schemas.VehicleOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def register_vehicle(
+    payload: schemas.VehicleBase,
+    client=Depends(require_client),
+    db: Session = Depends(get_db),
+):
+    try:
+        obj = crud.create_or_link_client_vehicle(db, client.id, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    from ..event_manager import event_manager
+
+    event_manager.publish("vehicle", {"type": "updated"})
+    return obj
+
+
+@router.delete("/vehicles/{vehicle_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_vehicle(
+    vehicle_id: int,
+    client=Depends(require_client),
+    db: Session = Depends(get_db),
+):
+    try:
+        crud.unlink_client_vehicle(db, client.id, vehicle_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    from ..event_manager import event_manager
+
+    event_manager.publish("vehicle", {"type": "updated"})
+    return None

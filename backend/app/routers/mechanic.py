@@ -70,6 +70,8 @@ def bootstrap_setup(payload: schemas.AdminSetup, db: Session = Depends(get_db)):
         ),
         hash_password(payload.password),
     )
+    if payload.logo_data_url:
+        crud.update_site_settings(db, payload.logo_data_url)
     return schemas.MechanicAuthResponse(
         token=create_access_token(str(user.id), AUDIENCE_MECHANIC),
         refresh_token=create_refresh_token(str(user.id), AUDIENCE_MECHANIC),
@@ -402,6 +404,26 @@ def update_status(
     return result
 
 
+@router.put(
+    "/appointments/{number}/reservation", response_model=schemas.AppointmentOut,
+    dependencies=[Depends(require_mechanic)],
+)
+def update_reservation(
+    number: str,
+    payload: schemas.AppointmentReservationUpdate,
+    db: Session = Depends(get_db),
+):
+    obj = crud.get_by_number(db, number)
+    if not obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Appointment not found",
+        )
+    result = crud.update_reserved_dates(db, obj, payload.reserved_dates)
+    event_manager.publish("appointment", {"type": "updated", "number": number})
+    return result
+
+
 @router.delete(
     "/appointments/{number}", status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_mechanic)],
@@ -519,6 +541,23 @@ def get_appointment_time(db: Session = Depends(get_db)):
     return {"unit": obj.unit, "value": obj.value, "updated_at": obj.updated_at}
 
 
+@router.get("/settings/site", response_model=schemas.SiteSettingsOut,
+            dependencies=[Depends(require_mechanic)])
+def get_site_settings_mech(db: Session = Depends(get_db)):
+    obj = crud.get_site_settings(db)
+    return schemas.SiteSettingsOut(logo_data_url=obj.logo_data_url)
+
+
+@router.put("/settings/site", response_model=schemas.SiteSettingsOut,
+            dependencies=[Depends(require_mechanic)])
+def update_site_settings_mech(
+    payload: schemas.SiteSettingsUpdate, db: Session = Depends(get_db)
+):
+    obj = crud.update_site_settings(db, payload.logo_data_url or "")
+    event_manager.publish("settings", {"type": "updated"})
+    return schemas.SiteSettingsOut(logo_data_url=obj.logo_data_url)
+
+
 @router.put("/appointment-time", dependencies=[Depends(require_mechanic)])
 def update_appointment_time(
     payload: schemas.AppointmentTimeSettingsUpdate, db: Session = Depends(get_db)
@@ -539,10 +578,12 @@ def list_vehicles(
 ):
     objs = crud.list_vehicles(db, q)
     counts = crud.count_vehicle_visits(db, [o.id for o in objs])
+    owners = crud.list_vehicle_owners(db, [o.id for o in objs])
     out = []
     for o in objs:
         s = schemas.VehicleSummaryOut.model_validate(o)
         s.visits_count = counts.get(o.id, 0)
+        s.owners = [schemas.ClientBrief.model_validate(c) for c in owners.get(o.id, [])]
         out.append(s)
     return out
 
@@ -565,7 +606,10 @@ def get_vehicle(vehicle_id: int, db: Session = Depends(get_db)):
     obj = crud.get_vehicle(db, vehicle_id)
     if obj is None:
         raise HTTPException(status_code=404, detail="Vehicle not found")
-    return obj
+    owners = crud.list_vehicle_owners(db, [obj.id]).get(obj.id, [])
+    out = schemas.VehicleOut.model_validate(obj)
+    out.owners = [schemas.ClientBrief.model_validate(c) for c in owners]
+    return out
 
 
 @router.put("/vehicles/{vehicle_id}", response_model=schemas.VehicleOut,

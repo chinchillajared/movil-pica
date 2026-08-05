@@ -52,18 +52,20 @@ function showView(viewName) {
     currentView = "landing";
     stopCalPoll();
     localStorage.setItem("mechanic_current_view", "landing");
-    return;
+  } else {
+    var target = $("view-" + viewName);
+    if (target) target.classList.remove("hidden");
+    if (landingView) landingView.classList.add("hidden");
+    currentView = viewName;
+    localStorage.setItem("mechanic_current_view", viewName);
+    if (viewName === "vehicle-detail" && currentVehicleId != null) {
+      localStorage.setItem("mechanic_current_vehicle", String(currentVehicleId));
+    }
+    if (viewName === "calendar") startCalPoll();
+    else stopCalPoll();
   }
-  var target = $("view-" + viewName);
-  if (target) target.classList.remove("hidden");
-  if (landingView) landingView.classList.add("hidden");
-  currentView = viewName;
-  localStorage.setItem("mechanic_current_view", viewName);
-  if (viewName === "vehicle-detail" && currentVehicleId != null) {
-    localStorage.setItem("mechanic_current_vehicle", String(currentVehicleId));
-  }
-  if (viewName === "calendar") startCalPoll();
-  else stopCalPoll();
+  var backHome = $("back-home-btn");
+  if (backHome) backHome.classList.toggle("hidden", viewName === "landing");
 }
 
 function flash(msg, isError) {
@@ -396,6 +398,27 @@ function pickStatus(statuses) {
 function initLoginPage() {
   var loginForm = $("login-form");
   var setupForm = $("setup-form");
+  var setupLogoDataUrl = "";
+
+  var setupLogoBtn = $("setup-logo-btn");
+  if (setupLogoBtn) {
+    setupLogoBtn.addEventListener("click", function () {
+      var input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.style.display = "none";
+      document.body.appendChild(input);
+      input.addEventListener("change", function () {
+        fileToDataURL(input, 2 * 1024 * 1024, function (dataUrl) {
+          setupLogoDataUrl = dataUrl;
+          var preview = $("setup-logo-preview");
+          if (preview) { preview.src = dataUrl; preview.classList.remove("hidden"); }
+        });
+        input.remove();
+      });
+      input.click();
+    });
+  }
 
   window.API.mechanic.bootstrapStatus().then(function (status) {
     if (status.needs_setup) {
@@ -432,6 +455,7 @@ function initLoginPage() {
         name: $("setup-name").value.trim(),
         email: $("setup-email").value.trim(),
         password: $("setup-password").value,
+        logo_data_url: setupLogoDataUrl,
       };
       hideBox("setup-error");
       var btn = setupForm.querySelector("button[type=submit]");
@@ -829,7 +853,12 @@ function initGearMenu() {
   var backHome = $("back-home-btn");
   if (backHome) {
     backHome.addEventListener("click", function () {
-      window.location.href = "/user/";
+      if (currentView === "vehicle-detail") {
+        showView("vehicles");
+        renderVehiclesList();
+      } else {
+        showView("landing");
+      }
     });
   }
 }
@@ -968,7 +997,14 @@ function showCalDay(dateStr) {
   if (noAppt) noAppt.classList.remove("hidden");
   if (details) details.innerHTML = "";
 
-  window.API.mechanic.list().then(function (appts) {
+  Promise.all([
+    window.API.mechanic.list(),
+    window.API.mechanic.getAppointmentTime().catch(function () {
+      return { unit: "hours", value: 2 };
+    }),
+  ]).then(function (results) {
+    var appts = results[0] || [];
+    var apptTime = results[1];
     var list = (appts || []).filter(function (a) {
       return String(a.appointment_date) === dateStr;
     });
@@ -981,7 +1017,7 @@ function showCalDay(dateStr) {
     if (noAppt) noAppt.classList.add("hidden");
     if (card) card.classList.remove("hidden");
     list.forEach(function (a) {
-      if (details) details.appendChild(buildApptRow(a));
+      if (details) details.appendChild(buildApptRow(a, apptTime));
     });
   }).catch(function () {
     if (noAppt) noAppt.classList.remove("hidden");
@@ -989,7 +1025,44 @@ function showCalDay(dateStr) {
   });
 }
 
-function buildApptRow(a) {
+function pad2(n) { return n < 10 ? "0" + n : "" + n; }
+
+function hourLabel12(h) {
+  var h12 = h % 12 || 12;
+  var ampm = h < 12 ? "AM" : (h >= 24 ? "AM" : "PM");
+  return h12 + ":00 " + ampm;
+}
+
+function reservedPeriodText(a, apptTime) {
+  var unit = (apptTime && apptTime.unit) || "hours";
+  var value = (apptTime && apptTime.value) || 2;
+  var text = "";
+  var base = formatLongDate(String(a.appointment_date));
+  if (unit === "days") {
+    if (value > 1) {
+      var end = new Date(String(a.appointment_date) + "T12:00:00");
+      end.setDate(end.getDate() + value - 1);
+      var endStr = end.getFullYear() + "-" + pad2(end.getMonth() + 1) + "-" + pad2(end.getDate());
+      text = base + " - " + formatLongDate(endStr) + " (" + value + " " + t("cal_reserved_days") + ")";
+    } else {
+      text = base + " (1 " + t("cal_reserved_days") + ")";
+    }
+  } else {
+    var tv = to12(a.appointment_time);
+    var startHour = parseInt(String(a.appointment_time).split(":")[0], 10);
+    var startLabel = tv.hour + ":" + tv.minute + " " + tv.ampm;
+    var endLabel = hourLabel12(startHour + value);
+    text = base + ", " + startLabel + " - " + endLabel + " (" + value + " " + t("cal_reserved_hours") + ")";
+  }
+  var extra = (a.reserved_dates || []).slice().sort();
+  if (extra.length) {
+    var extraParts = extra.map(function (d) { return formatLongDate(d); });
+    text += " + " + extra.length + " " + t("cal_reserved_extra") + ": " + extraParts.join(", ");
+  }
+  return text;
+}
+
+function buildApptRow(a, apptTime) {
   var row = document.createElement("div");
   row.className = "py-3 border-b border-slate-100";
 
@@ -1046,7 +1119,218 @@ function buildApptRow(a) {
   }));
 
   row.appendChild(actions);
+
+  var reserved = document.createElement("div");
+  reserved.className = "mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-2";
+  var reservedInfo = document.createElement("div");
+  reservedInfo.className = "text-sm";
+  reservedInfo.innerHTML =
+    "<span class='text-slate-500'>" + t("cal_reserved") + ":</span> " +
+    "<span class='font-medium text-slate-800'>" + escapeHTML(reservedPeriodText(a, apptTime)) + "</span>";
+  reserved.appendChild(reservedInfo);
+  reserved.appendChild(rowBtn(t("cal_reserved_edit"), "btn-secondary", function () {
+    openReservationPicker(a, function () {
+      refreshCalDay(String(a.appointment_date));
+    });
+  }));
+  row.appendChild(reserved);
+
   return row;
+}
+
+function openReservationPicker(appt, onSave) {
+  Promise.all([
+    window.API.mechanic.getSchedule(),
+    window.API.mechanic.list(),
+    window.API.mechanic.getDaysOff(),
+    window.API.mechanic.getAppointmentTime().catch(function () { return { unit: "hours", value: 2 }; }),
+  ]).then(function (r) {
+    var working = ((r[0] && r[0].days) || []).map(function (d) { return d.day; });
+    var blocked = buildBlockedSet(appt, r[1] || [], r[2] || [], r[3]);
+    buildReservationPicker(appt, working, blocked, onSave);
+  }).catch(function () {
+    buildReservationPicker(appt, [], {}, onSave);
+  });
+}
+
+function buildBlockedSet(appt, appts, daysOff, apptTime) {
+  var blocked = {};
+  (daysOff || []).forEach(function (d) { blocked[String(d.day_off).slice(0, 10)] = true; });
+  var unit = (apptTime && apptTime.unit) || "hours";
+  var value = (apptTime && apptTime.value) || 2;
+  var baseDate = String(appt.appointment_date).slice(0, 10);
+
+  function blockRange(o) {
+    if (unit === "days") {
+      var start = new Date(String(o.appointment_date) + "T12:00:00");
+      for (var i = 0; i < value; i++) {
+        var dd = new Date(start);
+        dd.setDate(start.getDate() + i);
+        blocked[dd.getFullYear() + "-" + pad2(dd.getMonth() + 1) + "-" + pad2(dd.getDate())] = true;
+      }
+    }
+  }
+
+  (appts || []).forEach(function (o) {
+    if (o.status === "cancelled" || o.status === "completed") return;
+    var isSelf = o.appointment_number === appt.appointment_number;
+    if (isSelf) {
+      blockRange(o);
+      delete blocked[baseDate];
+      (o.reserved_dates || []).forEach(function (d) { delete blocked[String(d).slice(0, 10)]; });
+    } else {
+      blocked[String(o.appointment_date).slice(0, 10)] = true;
+      (o.reserved_dates || []).forEach(function (d) { blocked[String(d).slice(0, 10)] = true; });
+      blockRange(o);
+    }
+  });
+  return blocked;
+}
+
+function buildReservationPicker(appt, workingDowList, blockedSet, onSave) {
+  var m = openModal(t("cal_reserved_edit"), "");
+  var baseDate = String(appt.appointment_date).slice(0, 10);
+  var year = parseInt(baseDate.slice(0, 4), 10);
+  var month = parseInt(baseDate.slice(5, 7), 10) - 1;
+  var workingSet = {};
+  workingDowList.forEach(function (d) { workingSet[d] = true; });
+  var selected = {};
+  (appt.reserved_dates || []).forEach(function (d) { selected[d] = true; });
+  var monthNames = monthNamesES();
+  var dayNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function ds(y, mo, d) { return y + "-" + pad(mo + 1) + "-" + pad(d); }
+
+  function render() {
+    var head = document.createElement("div");
+    head.className = "flex items-center justify-between mb-2";
+    var prev = document.createElement("button");
+    prev.type = "button";
+    prev.className = "btn-secondary !px-3 !py-1";
+    prev.textContent = "←";
+    var label = document.createElement("span");
+    label.className = "font-semibold";
+    label.textContent = monthNames[month] + " " + year;
+    var next = document.createElement("button");
+    next.type = "button";
+    next.className = "btn-secondary !px-3 !py-1";
+    next.textContent = "→";
+    head.appendChild(prev);
+    head.appendChild(label);
+    head.appendChild(next);
+    m.body.innerHTML = "";
+    m.body.appendChild(head);
+
+    var sub = document.createElement("p");
+    sub.className = "text-xs text-slate-500 mb-3";
+    sub.textContent = t("cal_reserved_subtitle");
+    m.body.appendChild(sub);
+
+    var grid = document.createElement("div");
+    grid.className = "grid grid-cols-7 gap-1 text-center";
+    dayNames.forEach(function (d) {
+      var c = document.createElement("div");
+      c.className = "text-xs font-semibold text-slate-400 py-1";
+      c.textContent = d;
+      grid.appendChild(c);
+    });
+
+    var firstDow = new Date(year, month, 1).getDay();
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (var i = 0; i < firstDow; i++) grid.appendChild(document.createElement("div"));
+    for (var d = 1; d <= daysInMonth; d++) {
+      var date = new Date(year, month, d);
+      var dateStr = ds(year, month, d);
+      var isBase = dateStr === baseDate;
+      var working = !!workingSet[date.getDay()];
+      var isSel = !!selected[dateStr];
+      var blocked = !isSel && !!blockedSet[dateStr];
+      var cell = document.createElement("button");
+      cell.type = "button";
+      cell.textContent = d;
+      if (isBase) {
+        cell.className = "p-2 rounded-lg text-sm font-semibold cursor-not-allowed border bg-brand-50 text-brand-700 border-brand-300";
+        cell.disabled = true;
+      } else if (isSel) {
+        cell.className = "p-2 rounded-lg text-sm font-semibold transition border bg-brand-600 text-white border-brand-600";
+      } else if (blocked) {
+        cell.className = "p-2 rounded-lg text-sm text-slate-300 cursor-not-allowed border border-red-200 bg-red-50";
+        cell.disabled = true;
+      } else if (!working) {
+        cell.className = "p-2 rounded-lg text-sm text-slate-300 cursor-not-allowed border border-slate-200 bg-slate-50";
+        cell.disabled = true;
+      } else {
+        cell.className = "p-2 rounded-lg text-sm transition border bg-green-50 hover:bg-green-100 text-slate-800 border-green-200 cursor-pointer";
+      }
+      if (!isBase && !blocked && working) {
+        cell.addEventListener("click", (function (dateStr) {
+          return function () {
+            if (selected[dateStr]) delete selected[dateStr];
+            else selected[dateStr] = true;
+            render();
+          };
+        })(dateStr));
+      }
+      grid.appendChild(cell);
+    }
+    m.body.appendChild(grid);
+
+    var legend = document.createElement("div");
+    legend.className = "mt-3 flex items-center gap-4 text-xs text-slate-500";
+    var lg1 = document.createElement("span");
+    lg1.innerHTML = "<span class='inline-block w-3 h-3 rounded bg-brand-50 border border-brand-300 align-middle'></span> " + escapeHTML(t("cal_reserved_legend_base"));
+    var lg2 = document.createElement("span");
+    lg2.innerHTML = "<span class='inline-block w-3 h-3 rounded bg-brand-600 align-middle'></span> " + escapeHTML(t("cal_reserved_legend_extra"));
+    var lg3 = document.createElement("span");
+    lg3.innerHTML = "<span class='inline-block w-3 h-3 rounded bg-green-200 align-middle'></span> " + escapeHTML(t("cal_reserved_legend_work"));
+    var lg4 = document.createElement("span");
+    lg4.innerHTML = "<span class='inline-block w-3 h-3 rounded bg-red-50 border border-red-200 align-middle'></span> " + escapeHTML(t("cal_reserved_legend_taken"));
+    legend.appendChild(lg1);
+    legend.appendChild(lg2);
+    legend.appendChild(lg3);
+    legend.appendChild(lg4);
+    m.body.appendChild(legend);
+
+    var footer = document.createElement("div");
+    footer.className = "mt-4 flex items-center justify-between gap-2";
+    var count = document.createElement("span");
+    count.className = "text-sm text-slate-600 font-medium";
+    var n = Object.keys(selected).length;
+    count.textContent = n === 0 ? t("cal_reserved_no_extra") : n + " " + t("cal_reserved_extra");
+    var saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "btn-primary";
+    saveBtn.textContent = t("cal_reserved_save");
+    saveBtn.addEventListener("click", function () {
+      saveBtn.disabled = true;
+      window.API.mechanic.updateReservation(appt.appointment_number, {
+        reserved_dates: Object.keys(selected).sort(),
+      }).then(function () {
+        closeModal();
+        flash(t("cal_reserved_saved"));
+        if (onSave) onSave();
+      }).catch(function (err) {
+        saveBtn.disabled = false;
+        flash(err.message || t("error_generic"), true);
+      });
+    });
+    footer.appendChild(count);
+    footer.appendChild(saveBtn);
+    m.body.appendChild(footer);
+
+    prev.addEventListener("click", function () {
+      month--;
+      if (month < 0) { month = 11; year--; }
+      render();
+    });
+    next.addEventListener("click", function () {
+      month++;
+      if (month > 11) { month = 0; year++; }
+      render();
+    });
+  }
+  render();
 }
 
 function rowBtn(label, cls, onClick) {
@@ -1549,6 +1833,11 @@ function openResetPasswordModal(u) {
 var vehiclesSearchTimer = null;
 var currentVehicleId = null;
 
+function ownersLabel(owners) {
+  if (!owners || !owners.length) return "";
+  return owners.map(function (o) { return o.first_name + " " + o.last_name; }).join(", ");
+}
+
 function renderVehiclesList(q) {
   var list = $("vehicles-list");
   var empty = $("vehicles-empty");
@@ -1589,9 +1878,13 @@ function renderVehiclesList(q) {
       var info = document.createElement("div");
       info.className = "min-w-0";
       var visitsLabel = v.visits_count === 1 ? "1 " + t("vehicles_visits") : (v.visits_count + " " + t("vehicles_visits"));
+      var ownerLine = (v.owners && v.owners.length)
+        ? "<p class='text-xs text-brand-700 truncate'>" + escapeHTML(t("vehicles_owner") + ": " + ownersLabel(v.owners)) + "</p>"
+        : "";
       info.innerHTML =
         "<p class='font-medium text-slate-800'>" + escapeHTML(v.plate) + "</p>" +
-        "<p class='text-sm text-slate-500 truncate'>" + escapeHTML(v.make + " " + v.model + (v.year ? " (" + v.year + ")" : "")) + " &middot; " + escapeHTML(visitsLabel) + "</p>";
+        "<p class='text-sm text-slate-500 truncate'>" + escapeHTML(v.make + " " + v.model + (v.year ? " (" + v.year + ")" : "")) + " &middot; " + escapeHTML(visitsLabel) + "</p>" +
+        ownerLine;
       left.appendChild(info);
       row.appendChild(left);
       var arrow = document.createElement("span");
@@ -1637,6 +1930,9 @@ function renderVehicleDetail(vehicleId) {
       "<p><span class='text-slate-500'>" + escapeHTML(t("vehicles_model")) + ":</span> " + escapeHTML(v.model || "—") + "</p>" +
       "<p><span class='text-slate-500'>" + escapeHTML(t("vehicles_year")) + ":</span> " + escapeHTML(v.year || "—") + "</p>" +
       "<p><span class='text-slate-500'>" + escapeHTML(t("vehicles_color")) + ":</span> " + escapeHTML(v.color || "—") + "</p>";
+    if (v.owners && v.owners.length) {
+      info.innerHTML += "<p><span class='text-slate-500'>" + escapeHTML(t("vehicles_owner")) + ":</span> <span class='font-medium'>" + escapeHTML(ownersLabel(v.owners)) + "</span></p>";
+    }
     top.appendChild(info);
     body.appendChild(top);
 
@@ -1852,7 +2148,6 @@ function openVisitModal(vehicleId, visit, onSaved) {
     return h;
   };
 
-  form.appendChild(sectionTitle(t("visits_mileage_photo")));
   var topPhotos = document.createElement("div");
   topPhotos.className = "grid grid-cols-1 sm:grid-cols-2 gap-4";
   topPhotos.appendChild(singlePhotoCell("mileage_photo", t("visits_mileage_photo")));

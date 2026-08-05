@@ -1,10 +1,10 @@
 # Mecánico móvil — Appointment Scheduler
 
 A self-contained web app for a mobile mechanic business. Clients can schedule
-appointments, check their status, and create accounts. The mechanic has a
-multi-user panel (roles: admin / mechanic) with an appointment calendar, a
-vehicle service-history log, announcements, settings, and a Gmail email
-integration.
+appointments, check their status, create accounts, and register their own
+vehicles. The mechanic has a multi-user panel (roles: admin / mechanic) with an
+appointment calendar, a vehicle service-history log, announcements, settings, a
+Gmail email integration, and a user-uploaded site logo.
 
 ## Stack
 
@@ -23,10 +23,14 @@ integration.
 ## Features
 
 ### Public site
-- Home page with **Schedule an appointment** and **Check status**
+- Home page with **Schedule an appointment**, **Check status** and **My vehicles**
 - 3-step scheduling wizard: date → time → personal details
 - Human-friendly appointment number (e.g. `APT-20260616-0001`)
 - Client accounts: register / login, session tokens, form auto-prefill
+- **My vehicles (Mis vehículos):** logged-in clients can register their vehicles
+  (plate, make, model, year, color and front photo), view their list, and remove
+  them. Registering a vehicle that already exists in the shop **auto-links** the
+  client to the canonical vehicle instead of creating a duplicate.
 - Compact header: when logged out it shows an **Iniciar sesión/Registrarse** button
   and a gear icon; when logged in it shows **"Hola, {nombre}"** plus the gear icon.
   The gear menu holds the **language switcher**, **My account** (opens the
@@ -36,18 +40,29 @@ integration.
 - Calendar grays out past dates, days off, and dates with existing non-cancelled appointments
 - Time slots filtered to show only available times for the selected date
 - Active announcements banner
+- A **Back** button (instead of a plain home link) in the top-left of secondary pages
 
 ### Mechanic panel
 - **First-run setup:** when the panel has no users yet, the login page shows a
   *"Create admin"* form — the first account ever created becomes the main
-  administrator (role `admin`)
+  administrator (role `admin`). The setup form also lets the admin **upload a
+  logo** image; if provided it is stored and shown in the header of every page
+  (otherwise no logo is displayed)
 - Multi-user authentication with **email + password** (JWT access/refresh tokens)
 - Roles: `admin` (full access + user management) and `mechanic`
-- Landing shortcuts: appointment **calendar**, **announcements**, manual
-  appointment creation, **clients**, **users** (admin only), **settings** and
-  **vehicle history**
-- **Vehicle history (Historial de Vehículos):** register vehicles by license
-  plate with make/model/year/color and a single **front photo** (base64 in DB);
+- Landing shortcuts (in order): appointment **calendar**, **vehicle history**,
+  manual appointment creation, **clients**, **announcements**, **users** (admin
+  only) and **settings**
+- A **Back** button appears in the top-left of the header on every view
+  (calendar, announcements, settings, clients, users, vehicles, vehicle detail)
+  and returns to the previous view
+- **Vehicle history (Historial de Vehículos):** one canonical vehicle per license
+  plate (normalized, so `ABC-123` and `ABC123` are the same vehicle). Vehicles are
+  keyed by a normalized `plate_key` and can be **owned by multiple clients**
+  (many-to-many via `client_vehicles`); when a client registers a plate that
+  already exists, the client is linked to the same vehicle instead of duplicating
+  it. The list and detail view show the linked **client owner(s)**. Register
+  vehicles with make/model/year/color and a single **front photo** (base64 in DB);
   then add work visits per vehicle. Each work visit records a **title** (e.g.
   "Problema de arranque") plus its **date (today is saved automatically)** and
   is split in two parts: **Assessment (Valoración)**
@@ -72,7 +87,15 @@ integration.
 - Calendar day view lists each appointment with its details in a fixed order:
   **full name, appointment time (12-hour), plate number, appointment number**
   and **address/location** (falls back to *"Sin ubicación"* when empty), plus
-  quick actions to confirm, complete, cancel or delete
+  quick actions to confirm, complete, cancel or delete. Each appointment also
+  shows its **reserved time** — computed from the global appointment-time setting
+  (e.g. *"10 de Agosto, 8:00 AM - 10:00 AM (2 hora(s))"* for hours, or
+  *"10 - 11 de Agosto (2 día(s))"* for days) plus any extra reserved days — with
+  an **Edit reservation** button that opens a mini month calendar. There the
+  mechanic can **select/deselect extra reserved days** for that appointment
+  (days already reserved by any other appointment or by the default range are
+  shown as unavailable); saved extra days are blocked on the client booking
+  calendar too
 - **Unified header:** a single gear icon opens a menu with the logged-in user
   (name + role), the **language switcher**, **My account** (shows name, email and
   role, plus a button to change the password) and **Sign out**
@@ -86,8 +109,11 @@ integration.
   - **Appointment time:** **Unidad** (Horas / Días) and **Tiempo reservado**
     value buttons with a highlighted active option
   - **Days off:** a calendar-icon button opens the same month calendar used for
-    client/appointment scheduling; the chosen day is shown in full text
-    (e.g. *Miércoles 8 de Marzo del 2026*)
+    client/appointment scheduling; **multiple days can be selected** (working
+    days are shown in green like the client calendar, non-working days are
+    disabled, selected days are highlighted) and added together with an optional
+    reason; the list shows each date in full text (e.g. *Miércoles 8 de Marzo
+    del 2026*)
 - **User management (admin only):** create/edit users, reset passwords, activate/deactivate, delete
 - **Clients view:** list registered clients and send emails to them
 - **Announcements:** create/edit/delete banner messages with a background color
@@ -114,7 +140,8 @@ Then open:
 
 **First use of the mechanic panel:** open `/mechanic/` with no users in the
 database and you will be asked to create the administrator account (name, email,
-password). That first account has the `admin` role.
+password, and optionally **upload a logo**). That first account has the `admin`
+role.
 
 ## Configuration
 
@@ -168,6 +195,7 @@ accounts are created on first run and managed by the admin.
 | `address`           | `TEXT`        |                                      |
 | `appointment_date`  | `DATE`        |                                      |
 | `appointment_time`  | `TIME`        |                                      |
+| `reserved_dates`    | `JSON`        | Extra specific days (ISO) this appointment is reserved on |
 | `status`            | `VARCHAR(20)` | `pending` / `confirmed` / `completed` / `cancelled` |
 | `created_at` / `updated_at` | `TIMESTAMPTZ` | Auto-managed timestamps    |
 
@@ -180,7 +208,15 @@ Other tables:
 - **`days_off`** — non-working dates
 - **`appointment_time_settings`** — how long each appointment blocks availability (unit: hours/days)
 - **`gmail_settings`** — Gmail OAuth credentials and state (singleton row `id=1`)
-- **`vehicles`** — vehicle cards keyed by unique plate; single front photo stored as base64 text
+- **`site_settings`** — site-wide settings (singleton row `id=1`); stores the
+  uploaded `logo_data_url` (base64) shown in every page header
+- **`vehicles`** — canonical vehicle cards keyed by normalized `plate_key`
+  (unique, uppercase without spaces/dashes); `plate` is kept for display. Single
+  front photo stored as base64 text. Vehicles are shared across the mechanic and
+  multiple clients via `client_vehicles`
+- **`client_vehicles`** — many-to-many link between `clients` and `vehicles`
+  (unique per client/vehicle pair). Registering a plate that already exists links
+  the client instead of duplicating the vehicle; a client "delete" only unlinks
 - **`vehicle_visits`** — work records (title, date, mileage photo, fuel-level photo, condition photos front/left/right/rear, defects/observations photos, observations, belongings + belongings photos, jobs with photos + diagnostic + observations) per vehicle (FK `vehicles.id`, cascade delete)
 
 ## Gmail integration (optional)
@@ -251,8 +287,8 @@ After pgAdmin loads:
 │       ├── event_manager.py     # SSE pub/sub
 │       ├── i18n.py              # Server-side translation helper
 │       └── routers/
-│           ├── public.py        # Public endpoints (appointments, schedule, announcements)
-│           ├── client_auth.py   # Client register / login / refresh / me
+│           ├── public.py        # Public endpoints (appointments, schedule, announcements, site settings)
+│           ├── client_auth.py   # Client register / login / refresh / me / vehicles
 │           ├── mechanic.py      # Panel auth, users, gmail, appointments, settings
 │           ├── events.py        # SSE stream
 │           └── i18n_router.py   # Translation file endpoint
@@ -271,9 +307,10 @@ After pgAdmin loads:
     │   ├── i18n.js              # Client-side translation engine
     │   └── styles.css           # Built Tailwind output
     ├── user/                    # User-facing pages
-    │   ├── index.html            # Home (schedule / check status)
+    │   ├── index.html            # Home (schedule / check status / my vehicles)
     │   ├── schedule.html         # 3-step appointment wizard
-    │   └── status.html           # Appointment lookup form + result card
+    │   ├── status.html           # Appointment lookup form + result card
+    │   └── vehicles.html         # My vehicles (register / list / remove)
     └── mechanic/                # Mechanic panel pages
         ├── index.html            # Login / first-run admin setup
         ├── dashboard.html        # Appointments, calendar, announcements, clients,
@@ -297,6 +334,7 @@ After pgAdmin loads:
 | PATCH  | `/api/appointments/{number}/cancel` | Cancel appointment                 |
 | GET    | `/api/schedule`                 | Current work schedule                 |
 | GET    | `/api/announcements/active`     | Active announcement banner            |
+| GET    | `/api/site/settings`            | Site settings (e.g. `logo_data_url`)  |
 | GET    | `/api/health`                   | Health check                          |
 
 ### Client auth (`/api/auth`)
@@ -307,6 +345,9 @@ After pgAdmin loads:
 | POST   | `/login`     | Login (returns access + refresh token) |
 | POST   | `/refresh`   | Exchange refresh token for a new access token |
 | GET    | `/me`        | Current client profile (Bearer token)  |
+| GET    | `/vehicles`  | List my vehicles                       |
+| POST   | `/vehicles`  | Register a vehicle (creates or **auto-links** to an existing one by plate) |
+| DELETE | `/vehicles/{id}` | **Unlink** my vehicle (canonical vehicle and its visits are kept) |
 
 ### Mechanic (`/api/mechanic`) — requires `X-Mechanic-Key` header (JWT), except `bootstrap` and `login`
 
@@ -334,6 +375,7 @@ After pgAdmin loads:
 | GET    | `/appointments?status=&date_from=` | List appointments (optional status filter and date_from) |
 | POST   | `/appointments`                 | Create appointment (manual)            |
 | PATCH  | `/appointments/{number}`        | Update status (e.g. `{"status":"confirmed"}`) |
+| PUT    | `/appointments/{number}/reservation` | Update extra reserved days (`{"reserved_dates":["YYYY-MM-DD",...]}`) |
 | DELETE | `/appointments/{number}`        | Delete an appointment                  |
 | GET    | `/calendar?year=&month=`        | Calendar bookings for a month          |
 | GET    | `/announcements`                | List announcements                     |
@@ -345,9 +387,10 @@ After pgAdmin loads:
 | POST   | `/days-off`                     | Add a day off                          |
 | DELETE | `/days-off/{date}`              | Remove a day off                       |
 | GET/PUT| `/appointment-time`             | Get / update appointment time settings |
+| GET/PUT| `/settings/site`                 | Get / update site settings (uploaded logo) |
 | GET    | `/vehicles?q=`                 | Search vehicles by plate/make/model     |
 | POST   | `/vehicles`                    | Register a vehicle                      |
-| GET    | `/vehicles/{id}`               | Vehicle detail (photos, visits)         |
+| GET    | `/vehicles/{id}`               | Vehicle detail (photos, visits, owners) |
 | PUT    | `/vehicles/{id}`               | Update a vehicle                        |
 | DELETE | `/vehicles/{id}`               | Delete a vehicle and its visits         |
 | POST   | `/vehicles/{id}/visits`        | Add a work record to a vehicle          |
@@ -380,6 +423,18 @@ After pgAdmin loads:
 - The **days-off** calendar picker reuses the same calendar look as the client and
   calendar views (month navigation, weekday headers, day grid) to keep the UI
   consistent across the app.
+- Vehicles are **canonical**: a normalized `plate_key` (uppercase, non-alphanumerics
+  removed) is the unique identity, so formatting differences (`ABC-123` vs
+  `ABC123`) never create duplicates. Ownership is a **many-to-many** via
+  `client_vehicles`; client registration auto-links to an existing vehicle and a
+  client delete only unlinks. The mechanic panel shows the linked owners.
+- Each appointment can hold **extra reserved days** (`reserved_dates` JSON).
+  Those days are added to the taken dates returned to the client calendar, so
+  they cannot be booked by other clients.
+- The site **logo** is uploaded during first-run setup (or via
+  `/api/mechanic/settings/site`) and stored as a base64 data URL in the
+  `site_settings` singleton; every header `<img data-site-logo>` loads it from
+  the public `/api/site/settings` endpoint, hiding when none is set.
 - Emails are sent through the **Gmail API** when activated; otherwise the legacy SMTP settings are used as a fallback, and if neither is configured, sending is skipped without error.
 - Translations exist in two places: the backend `translations/` folder (for API error messages) and the frontend `locales/` folder (for UI strings). Both should be kept in sync.
 - The frontend Docker image uses a multi-stage build: `node:20-alpine` builds Tailwind, then the output is copied into an `nginx:alpine` image for serving.

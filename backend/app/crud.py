@@ -88,6 +88,15 @@ def update_status(
     return obj
 
 
+def update_reserved_dates(
+    db: Session, obj: models.Appointment, reserved_dates: list[str]
+) -> models.Appointment:
+    obj.reserved_dates = list(dict.fromkeys(reserved_dates or []))
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
 def delete_appointment(db: Session, obj: models.Appointment) -> None:
     db.delete(obj)
     db.commit()
@@ -104,21 +113,27 @@ def get_taken_dates(
     query_from = from_date - timedelta(days=1)
     query_to = to_date + timedelta(days=1)
     stmt = (
-        select(models.Appointment.appointment_date)
+        select(models.Appointment.appointment_date, models.Appointment.reserved_dates)
         .where(
             models.Appointment.appointment_date >= query_from,
             models.Appointment.appointment_date <= query_to,
             models.Appointment.status.notin_(["cancelled", "completed"]),
         )
-        .distinct()
     )
-    appt_dates = set(row[0] for row in db.execute(stmt).all())
+    rows = db.execute(stmt).all()
+    appt_dates = set(d for d, _ in rows)
     blocked = set()
     if settings.unit == "days":
         for d in appt_dates:
             for i in range(settings.value):
                 blocked.add(d + timedelta(days=i))
     # In "hours" mode, appointment days stay available (only hours are blocked).
+    for _, reserved in rows:
+        for extra in reserved or []:
+            try:
+                blocked.add(date.fromisoformat(str(extra)))
+            except ValueError:
+                continue
     for d in list_days_off(db):
         blocked.add(d.day_off)
     return sorted([d for d in blocked if from_date <= d <= to_date and d not in exclude])
@@ -378,6 +393,27 @@ def update_appointment_time_settings(
     return obj
 
 
+def get_site_settings(db: Session) -> models.SiteSettings:
+    obj = db.get(models.SiteSettings, 1)
+    if not obj:
+        obj = models.SiteSettings(id=1, logo_data_url="")
+        db.add(obj)
+        db.commit()
+        db.refresh(obj)
+    return obj
+
+
+def update_site_settings(
+    db: Session, logo_data_url: Optional[str] = None
+) -> models.SiteSettings:
+    obj = get_site_settings(db)
+    if logo_data_url is not None:
+        obj.logo_data_url = logo_data_url
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
 # --------------------------------------------------------------------------
 # Clients (public registered accounts)
 # --------------------------------------------------------------------------
@@ -566,6 +602,7 @@ def list_vehicles(db: Session, q: str = "") -> list[models.Vehicle]:
         like = f"%{q.strip().upper()}%"
         stmt = stmt.where(
             models.Vehicle.plate.like(like)
+            | models.Vehicle.plate_key.like(f"%{schemas.normalize_plate_key(q)}%")
             | models.Vehicle.make.ilike(f"%{q.strip()}%")
             | models.Vehicle.model.ilike(f"%{q.strip()}%")
         )
@@ -590,9 +627,43 @@ def count_vehicle_visits(
     return dict(db.execute(stmt).all())
 
 
-def create_vehicle(db: Session, data: schemas.VehicleBase) -> models.Vehicle:
+def list_vehicle_owners(
+    db: Session, vehicle_ids: list[int]
+) -> dict[int, list[models.Client]]:
+    if not vehicle_ids:
+        return {}
+    rows = db.execute(
+        select(models.ClientVehicle.vehicle_id, models.Client)
+        .join(models.Client, models.Client.id == models.ClientVehicle.client_id)
+        .where(models.ClientVehicle.vehicle_id.in_(vehicle_ids))
+        .order_by(models.Client.first_name, models.Client.last_name)
+    ).all()
+    out: dict[int, list[models.Client]] = {}
+    for vehicle_id, client in rows:
+        out.setdefault(vehicle_id, []).append(client)
+    return out
+
+
+def _link_client_vehicle(
+    db: Session, client_id: int, vehicle_id: int
+) -> None:
+    exists = db.execute(
+        select(models.ClientVehicle).where(
+            models.ClientVehicle.client_id == client_id,
+            models.ClientVehicle.vehicle_id == vehicle_id,
+        )
+    ).scalar_one_or_none()
+    if exists is None:
+        db.add(models.ClientVehicle(client_id=client_id, vehicle_id=vehicle_id))
+        db.commit()
+
+
+def create_vehicle(
+    db: Session, data: schemas.VehicleBase, client_id: Optional[int] = None
+) -> models.Vehicle:
     obj = models.Vehicle(
         plate=data.plate,
+        plate_key=schemas.normalize_plate_key(data.plate),
         make=data.make.strip(),
         model=data.model.strip(),
         year=data.year,
@@ -606,7 +677,69 @@ def create_vehicle(db: Session, data: schemas.VehicleBase) -> models.Vehicle:
         db.rollback()
         raise ValueError("plate already registered")
     db.refresh(obj)
+    if client_id is not None:
+        _link_client_vehicle(db, client_id, obj.id)
+        db.refresh(obj)
     return obj
+
+
+def create_or_link_client_vehicle(
+    db: Session, client_id: int, data: schemas.VehicleBase
+) -> models.Vehicle:
+    """Register a vehicle for a client: link to an existing canonical vehicle
+    by normalized plate when possible, otherwise create one."""
+    plate_key = schemas.normalize_plate_key(data.plate)
+    existing = db.execute(
+        select(models.Vehicle).where(models.Vehicle.plate_key == plate_key)
+    ).scalar_one_or_none()
+    if existing is None:
+        return create_vehicle(db, data, client_id=client_id)
+    _link_client_vehicle(db, client_id, existing.id)
+    changed = False
+    if data.make.strip() and not existing.make:
+        existing.make = data.make.strip()
+        changed = True
+    if data.model.strip() and not existing.model:
+        existing.model = data.model.strip()
+        changed = True
+    if data.year and existing.year is None:
+        existing.year = data.year
+        changed = True
+    if data.color.strip() and not existing.color:
+        existing.color = data.color.strip()
+        changed = True
+    if data.front_photo and not existing.front_photo:
+        existing.front_photo = data.front_photo
+        changed = True
+    if changed:
+        db.commit()
+        db.refresh(existing)
+    return existing
+
+
+def list_vehicles_by_client(db: Session, client_id: int) -> list[models.Vehicle]:
+    stmt = (
+        select(models.Vehicle)
+        .join(models.ClientVehicle, models.ClientVehicle.vehicle_id == models.Vehicle.id)
+        .where(models.ClientVehicle.client_id == client_id)
+        .order_by(models.Vehicle.plate)
+    )
+    return list(db.execute(stmt).scalars().all())
+
+
+def unlink_client_vehicle(
+    db: Session, client_id: int, vehicle_id: int
+) -> None:
+    link = db.execute(
+        select(models.ClientVehicle).where(
+            models.ClientVehicle.client_id == client_id,
+            models.ClientVehicle.vehicle_id == vehicle_id,
+        )
+    ).scalar_one_or_none()
+    if link is None:
+        raise ValueError("vehicle not found")
+    db.delete(link)
+    db.commit()
 
 
 def update_vehicle(
@@ -627,6 +760,7 @@ def update_vehicle(
         val = getattr(data, field, None)
         if val is not None:
             setattr(obj, attr, val if isinstance(val, str) else val)
+    obj.plate_key = schemas.normalize_plate_key(obj.plate)
     try:
         db.commit()
     except IntegrityError:

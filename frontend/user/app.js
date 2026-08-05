@@ -87,6 +87,54 @@ function initSchedule() {
   var today = new Date();
   today.setHours(0, 0, 0, 0);
   var todayMs = today.getTime();
+  var clientVehicles = {};
+  var vehicleSelectWired = false;
+
+  function setupVehicleSelector() {
+    var wrap = $("vehicle-select-wrap");
+    var select = $("vehicle-select");
+    var plateInput = $("plate");
+    if (!wrap || !select || !plateInput || vehicleSelectWired) return;
+    if (new URLSearchParams(location.search).get("edit")) return;
+    if (!window.ClientAuth || !window.ClientAuth.isLoggedIn()) return;
+    vehicleSelectWired = true;
+    window.API.auth.listVehicles().then(function (vehicles) {
+      if (!vehicles || !vehicles.length) return;
+      clientVehicles = {};
+      var other = document.createElement("option");
+      other.value = "__other__";
+      other.textContent = window.I18N ? window.I18N.t("vehicle_other") : "Another vehicle";
+      select.innerHTML = "";
+      select.appendChild(other);
+      vehicles.forEach(function (v) {
+        clientVehicles[v.id] = v;
+        var opt = document.createElement("option");
+        opt.value = String(v.id);
+        var label = v.plate;
+        var desc = [v.make, v.model].filter(Boolean).join(" ");
+        if (v.year) desc += " " + v.year;
+        if (desc) label += " — " + desc;
+        opt.textContent = label;
+        select.appendChild(opt);
+      });
+      select.value = "__other__";
+      wrap.classList.remove("hidden");
+    }).catch(function () {
+      vehicleSelectWired = false;
+    });
+    select.addEventListener("change", function () {
+      var val = select.value;
+      var chosen = clientVehicles[val];
+      if (chosen) {
+        plateInput.value = chosen.plate;
+        plateInput.disabled = true;
+      } else {
+        plateInput.value = "";
+        plateInput.disabled = false;
+        plateInput.focus();
+      }
+    });
+  }
 
   var schedule = { days: [
     { day: 1, start_time: "08:00", end_time: "17:00" },
@@ -506,6 +554,9 @@ function initSchedule() {
       });
     }
   }
+
+  window.setupScheduleVehicleSelector = setupVehicleSelector;
+  setupVehicleSelector();
 }
 
 function to12h(t) {
@@ -608,17 +659,229 @@ function initStatus() {
   });
 }
 
+function initVehicles() {
+  var t = window.I18N ? window.I18N.t.bind(window.I18N) : function (s) { return s; };
+  var loginRequired = $("login-required");
+  var content = $("vehicles-content");
+  var grid = $("vehicles-grid");
+  var openLoginBtn = $("btn-open-login");
+
+  if (openLoginBtn && window.ClientAuth) {
+    openLoginBtn.addEventListener("click", function () {
+      window.ClientAuth.openLogin();
+    });
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function showLoggedIn(state) {
+    if (loginRequired) loginRequired.classList.toggle("hidden", state);
+    if (content) content.classList.toggle("hidden", !state);
+  }
+
+  function loadVehicles() {
+    if (!grid) return;
+    grid.innerHTML = "";
+    window.API.auth.listVehicles().then(function (vehicles) {
+      (vehicles || []).forEach(function (v) { grid.appendChild(buildVehicleCard(v)); });
+      grid.appendChild(buildAddTile());
+    }).catch(function (err) {
+      if (err.status === 401) { showLoggedIn(false); return; }
+      showMessage(err.message || t("error_generic"));
+    });
+  }
+
+  function buildVehicleCard(v) {
+    var card = document.createElement("div");
+    card.className = "rounded-xl border border-slate-200 bg-white p-3 flex flex-col";
+    var photo = document.createElement("img");
+    photo.src = v.front_photo || "";
+    photo.alt = v.plate;
+    photo.className = "w-full aspect-square object-cover rounded-2xl border border-slate-200 bg-slate-50" + (v.front_photo ? "" : " hidden");
+    card.appendChild(photo);
+
+    var info = document.createElement("div");
+    info.className = "mt-3 text-sm";
+    var details = [v.make, v.model].filter(Boolean).join(" ");
+    if (v.year) details += " " + v.year;
+    info.innerHTML =
+      "<div class='font-semibold text-slate-800'>" + esc(v.plate) + "</div>" +
+      "<div class='text-slate-500'>" + esc(details) + "</div>" +
+      (v.color ? "<div class='text-slate-500'>" + esc(v.color) + "</div>" : "");
+    card.appendChild(info);
+
+    var del = document.createElement("button");
+    del.type = "button";
+    del.className = "mt-3 btn-danger !px-3 !py-1 text-sm self-end";
+    del.textContent = t("vehicles_delete");
+    del.addEventListener("click", function () {
+      showConfirm(t("vehicles_delete_confirm")).then(function (ok) {
+        if (!ok) return;
+        window.API.auth.deleteVehicle(v.id).then(loadVehicles).catch(function (err) {
+          showMessage(err.message || t("error_generic"));
+        });
+      });
+    });
+    card.appendChild(del);
+    return card;
+  }
+
+  function buildAddTile() {
+    var tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "rounded-xl border-2 border-dashed border-slate-300 bg-white hover:border-brand-400 hover:text-brand-700 text-slate-500 flex flex-col items-center justify-center gap-2 py-10 cursor-pointer";
+    tile.innerHTML = "<span class='text-3xl leading-none'>+</span><span class='text-sm font-medium'>" + esc(t("vehicles_add")) + "</span>";
+    tile.addEventListener("click", openAddVehicle);
+    return tile;
+  }
+
+  function openAddVehicle() {
+    var overlay = document.createElement("div");
+    overlay.className = "fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto";
+    var box = document.createElement("div");
+    box.className = "bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8";
+    box.innerHTML =
+      '<div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">' +
+        '<h3 class="text-lg font-bold text-slate-800">' + esc(t("vehicles_new_title")) + '</h3>' +
+        '<button type="button" id="vehicle-modal-close" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">&times;</button>' +
+      '</div>' +
+      '<form id="vehicle-form" novalidate class="p-5 space-y-4">' +
+        '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
+          '<div><label class="field-label" for="v-plate">' + esc(t("label_plate")) + '</label>' +
+            '<input id="v-plate" type="text" required class="field-input uppercase" placeholder="' + esc(t("placeholder_plate")) + '" /></div>' +
+          '<div><label class="field-label" for="v-make">' + esc(t("vehicles_make")) + '</label>' +
+            '<input id="v-make" type="text" required class="field-input" placeholder="' + esc(t("vehicles_make_ph")) + '" /></div>' +
+          '<div><label class="field-label" for="v-model">' + esc(t("vehicles_model")) + '</label>' +
+            '<input id="v-model" type="text" required class="field-input" placeholder="' + esc(t("vehicles_model_ph")) + '" /></div>' +
+          '<div><label class="field-label" for="v-year">' + esc(t("vehicles_year")) + '</label>' +
+            '<input id="v-year" type="number" min="1900" max="2200" class="field-input" placeholder="' + esc(t("vehicles_year_ph")) + '" /></div>' +
+          '<div class="sm:col-span-2"><label class="field-label" for="v-color">' + esc(t("vehicles_color")) + '</label>' +
+            '<input id="v-color" type="text" class="field-input" placeholder="' + esc(t("vehicles_color_ph")) + '" /></div>' +
+          '<div class="sm:col-span-2"><label class="field-label">' + esc(t("vehicles_photo")) + '</label>' +
+            '<div class="flex items-center gap-3">' +
+              '<img id="v-photo-preview" alt="" class="hidden h-20 w-28 object-cover rounded-lg border border-slate-200 bg-white" />' +
+              '<button id="v-photo-btn" type="button" class="btn-secondary">' + esc(t("vehicles_photo_upload")) + '</button>' +
+            '</div></div>' +
+        '</div>' +
+        '<p id="vehicle-form-error" class="hidden text-sm text-red-600"></p>' +
+        '<div class="flex justify-end gap-2 pt-2">' +
+          '<button type="button" id="vehicle-modal-cancel" class="btn-secondary">' + esc(t("btn_back")) + '</button>' +
+          '<button type="submit" class="btn-primary">' + esc(t("vehicles_save")) + '</button>' +
+        '</div>' +
+      '</form>';
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    var photoDataUrl = "";
+    var preview = box.querySelector("#v-photo-preview");
+    var photoBtn = box.querySelector("#v-photo-btn");
+    var err = box.querySelector("#vehicle-form-error");
+    var form = box.querySelector("#vehicle-form");
+
+    function close() { overlay.remove(); }
+
+    box.querySelector("#vehicle-modal-close").addEventListener("click", close);
+    box.querySelector("#vehicle-modal-cancel").addEventListener("click", close);
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+
+    photoBtn.addEventListener("click", function () {
+      var input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.style.display = "none";
+      document.body.appendChild(input);
+      input.addEventListener("change", function () {
+        fileToDataURL(input, 3 * 1024 * 1024, function (dataUrl) {
+          photoDataUrl = dataUrl;
+          preview.src = dataUrl;
+          preview.classList.remove("hidden");
+        });
+        input.remove();
+      });
+      input.click();
+    });
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var plate = form.querySelector("#v-plate").value.trim().toUpperCase();
+      var make = form.querySelector("#v-make").value.trim();
+      var model = form.querySelector("#v-model").value.trim();
+      var yearVal = form.querySelector("#v-year").value.trim();
+      var color = form.querySelector("#v-color").value.trim();
+      if (!plate || !make || !model) {
+        err.textContent = t("error_required");
+        err.classList.remove("hidden");
+        return;
+      }
+      err.classList.add("hidden");
+      window.API.auth.createVehicle({
+        plate: plate,
+        make: make,
+        model: model,
+        year: yearVal ? parseInt(yearVal, 10) : null,
+        color: color,
+        front_photo: photoDataUrl,
+      }).then(function () {
+        close();
+        loadVehicles();
+        showMessage(t("vehicles_saved"));
+      }).catch(function (err2) {
+        err.textContent = err2.message || t("error_generic");
+        err.classList.remove("hidden");
+      });
+    });
+  }
+
+  document.addEventListener("client:login", function () {
+    showLoggedIn(true);
+    loadVehicles();
+  });
+
+  var loggedIn = window.ClientAuth ? window.ClientAuth.isLoggedIn() : false;
+  if (loggedIn) { showLoggedIn(true); loadVehicles(); }
+  else { showLoggedIn(false); }
+}
+
+function fileToDataURL(input, maxBytes, onChange) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  if (maxBytes && file.size > maxBytes) {
+    showMessage("La imagen es demasiado grande (máx 3MB).");
+    input.value = "";
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function () { onChange(reader.result); };
+  reader.onerror = function () { input.value = ""; };
+  reader.readAsDataURL(file);
+}
+
+function $ (id) {
+  return document.getElementById(id);
+}
+
 document.addEventListener("i18n:ready", () => {
   if (window.__initDone) return;
   window.__initDone = true;
   if (window.PAGE === "schedule") initSchedule();
   if (window.PAGE === "status") initStatus();
+  if (window.PAGE === "vehicles") initVehicles();
   if (window.ClientAuth) {
     if (window.PAGE === "schedule") window.ClientAuth.prefillForm();
     if (window.PAGE === "schedule") {
-      window.ClientAuth.tryRefresh().then(function () { window.ClientAuth.prefillForm(); });
+      window.ClientAuth.tryRefresh().then(function () {
+        window.ClientAuth.prefillForm();
+        if (window.setupScheduleVehicleSelector) window.setupScheduleVehicleSelector();
+      });
     }
   }
+  document.addEventListener("client:login", function () {
+    if (window.setupScheduleVehicleSelector) window.setupScheduleVehicleSelector();
+  });
   loadAnnouncement();
   var es = new EventSource("/api/events/stream");
   es.addEventListener("announcement", function () { loadAnnouncement(); });

@@ -11,6 +11,7 @@ from sqlalchemy import (
     CheckConstraint,
     JSON,
     ForeignKey,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -38,6 +39,9 @@ class Appointment(Base):
     appointment_time = Column(Time, nullable=False)
     plate = Column(String(20), nullable=False, server_default="")
     address = Column(Text, nullable=False)
+    # reserved_dates: extra specific days (ISO "YYYY-MM-DD") reserved for this
+    # appointment beyond the appointment_date (blocked on the client calendar).
+    reserved_dates = Column(JSON, nullable=False, default=list)
     status = Column(String(20), nullable=False, default="pending")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
@@ -121,6 +125,34 @@ class Client(Base):
         onupdate=func.now(),
     )
 
+    vehicles = relationship(
+        "Vehicle",
+        secondary="client_vehicles",
+        back_populates="client_owners",
+        passive_deletes=True,
+    )
+
+
+class ClientVehicle(Base):
+    """Many-to-many link between clients and vehicles."""
+
+    __tablename__ = "client_vehicles"
+    __table_args__ = (
+        UniqueConstraint("client_id", "vehicle_id", name="uq_client_vehicle"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(
+        Integer, ForeignKey("clients.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    vehicle_id = Column(
+        Integer,
+        ForeignKey("vehicles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
 
 class User(Base):
     """Mechanic panel accounts (roles: admin / mechanic)."""
@@ -167,13 +199,30 @@ class GmailSettings(Base):
     )
 
 
+class SiteSettings(Base):
+    """Singleton (id=1) site-wide settings (e.g. uploaded logo)."""
+
+    __tablename__ = "site_settings"
+
+    id = Column(Integer, primary_key=True)
+    # logo_data_url: "<data-url base64>" uploaded by the admin (empty = none)
+    logo_data_url = Column(Text, nullable=False, server_default="")
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
 class Vehicle(Base):
-    """Vehicle card (Historial de Vehículos), identified by license plate."""
+    """Vehicle card (Historial de Vehículos), identified by canonical plate."""
 
     __tablename__ = "vehicles"
 
     id = Column(Integer, primary_key=True, index=True)
-    plate = Column(String(20), nullable=False, unique=True, index=True)
+    plate = Column(String(20), nullable=False, index=True)
+    # plate_key: canonical normalized plate (uppercase, no spaces/dashes) unique
+    plate_key = Column(String(20), nullable=False, unique=True, index=True, server_default="")
     make = Column(String(80), nullable=False, server_default="")
     model = Column(String(80), nullable=False, server_default="")
     year = Column(Integer, nullable=True)
@@ -192,6 +241,13 @@ class Vehicle(Base):
         back_populates="vehicle",
         cascade="all, delete-orphan",
         order_by="VehicleVisit.visit_date.desc(), VehicleVisit.id.desc()",
+    )
+
+    client_owners = relationship(
+        "Client",
+        secondary="client_vehicles",
+        back_populates="vehicles",
+        passive_deletes=True,
     )
 
 

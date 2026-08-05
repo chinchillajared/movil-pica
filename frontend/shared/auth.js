@@ -243,6 +243,7 @@
       overlay.remove();
       render();
       prefillForm();
+      document.dispatchEvent(new CustomEvent("client:login", { detail: data.client }));
     }
 
     overlay.querySelector("#auth-modal-close").addEventListener("click", function () { overlay.remove(); });
@@ -282,5 +283,5 @@
   }
 
   document.addEventListener("i18n:ready", render);
-  window.ClientAuth = { render: render, prefillForm: prefillForm, tryRefresh: tryRefresh, isLoggedIn: isLoggedIn, currentClient: currentClient };
+  window.ClientAuth = { render: render, prefillForm: prefillForm, tryRefresh: tryRefresh, isLoggedIn: isLoggedIn, currentClient: currentClient, openLogin: function () { openModal("login"); } };
 })();

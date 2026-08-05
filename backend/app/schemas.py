@@ -89,6 +89,27 @@ class AppointmentUpdateStatus(BaseModel):
         return v
 
 
+class AppointmentReservationUpdate(BaseModel):
+    reserved_dates: list[str] = Field(default_factory=list)
+
+    @field_validator("reserved_dates")
+    @classmethod
+    def clean_dates(cls, v: list[str]) -> list[str]:
+        out = []
+        seen = set()
+        for item in v or []:
+            item = str(item).strip()
+            try:
+                parsed = date.fromisoformat(item)
+            except ValueError:
+                raise ValueError("reserved_dates must be ISO dates (YYYY-MM-DD)")
+            key = parsed.isoformat()
+            if key not in seen:
+                seen.add(key)
+                out.append(key)
+        return sorted(out)
+
+
 class AppointmentOut(BaseModel):
     id: int
     appointment_number: str
@@ -101,6 +122,7 @@ class AppointmentOut(BaseModel):
     appointment_date: date
     appointment_time: time
     address: str
+    reserved_dates: list[str] = Field(default_factory=list)
     status: str
     created_at: datetime
     updated_at: datetime
@@ -410,11 +432,20 @@ class AdminSetup(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     email: str
     password: str = Field(..., min_length=_PASSWORD_MIN, max_length=128)
+    logo_data_url: str = Field(default="", max_length=20000000)
 
     @field_validator("email")
     @classmethod
     def check_email(cls, v: str) -> str:
         return _validate_email(v)
+
+
+class SiteSettingsOut(BaseModel):
+    logo_data_url: str = ""
+
+
+class SiteSettingsUpdate(BaseModel):
+    logo_data_url: Optional[str] = Field(default=None, max_length=20000000)
 
 
 class PasswordChange(BaseModel):
@@ -466,7 +497,12 @@ class EmailSend(BaseModel):
 # --------------------------------------------------------------------------
 # Vehicle history (Historial de Vehículos)
 # --------------------------------------------------------------------------
-_PLATE_RE = re.compile(r"^[A-Z0-9-]+$")
+_PLATE_RE = re.compile(r"^[A-Z0-9\-\s\.]+$")
+
+
+def normalize_plate_key(v: str) -> str:
+    """Canonical unique key: uppercase, non-alphanumerics removed."""
+    return re.sub(r"[^A-Z0-9]", "", (v or "").strip().upper())
 
 
 def _normalize_plate(v: str) -> str:
@@ -564,6 +600,16 @@ class VehicleVisitOut(BaseModel):
         from_attributes = True
 
 
+class ClientBrief(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+
+    class Config:
+        from_attributes = True
+
+
 class VehicleSummaryOut(BaseModel):
     id: int
     plate: str
@@ -571,6 +617,8 @@ class VehicleSummaryOut(BaseModel):
     model: str
     year: Optional[int] = None
     color: str
+    front_photo: str = ""
+    owners: list[ClientBrief] = Field(default_factory=list)
     visits_count: int = 0
     created_at: datetime
 
@@ -585,6 +633,7 @@ class VehicleOut(BaseModel):
     model: str
     year: Optional[int] = None
     color: str
+    owners: list[ClientBrief] = Field(default_factory=list)
     front_photo: str
     visits: list[VehicleVisitOut] = Field(default_factory=list)
     created_at: datetime
