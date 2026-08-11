@@ -12,6 +12,6 @@ COPY --from=builder /app/shared /usr/share/nginx/html/shared
 COPY --from=builder /app/locales /usr/share/nginx/html/locales
 COPY --from=builder /app/user /usr/share/nginx/html/user
 COPY --from=builder /app/mechanic /usr/share/nginx/html/mechanic
-COPY --from=builder /app/images /usr/share/nginx/html/images
+COPY --from=builder /app/icons /usr/share/nginx/html/icons
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

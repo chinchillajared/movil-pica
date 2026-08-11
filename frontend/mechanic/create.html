@@ -76,28 +76,52 @@
         <div id="step-3" class="hidden">
           <h2 class="text-xl font-bold mb-1 text-center" data-i18n="step_details_title">Your details</h2>
           <p class="text-slate-500 mb-1 text-center text-sm" data-i18n="step_details_subtitle">Enter your information to confirm</p>
-          <p class="text-center text-sm text-slate-700 font-medium mb-4">
+          <p class="text-center text-sm text-slate-700 font-medium mb-2">
             <span id="final-date-display"></span> &middot; <span id="final-time-display"></span>
+          </p>
+          <p class="mb-4 flex items-center gap-1 text-xs text-slate-500">
+            <span class="text-red-500 font-bold">*</span> <span data-i18n="required_field">Campo obligatorio</span>
           </p>
 
           <form id="create-form" novalidate class="space-y-4">
+            <div>
+              <label class="field-label" data-i18n="appointment_customer_type">Customer type</label>
+              <div class="inline-flex rounded-lg bg-slate-100 p-1 w-full sm:w-auto">
+                <button id="customer-guest" type="button" class="px-5 py-2 text-sm font-semibold rounded-md bg-white text-brand-700 shadow-sm" data-i18n="appointment_customer_guest">Guest</button>
+                <button id="customer-registered" type="button" class="px-5 py-2 text-sm font-semibold rounded-md text-slate-600 hover:text-slate-800" data-i18n="appointment_customer_registered">Registered client</button>
+              </div>
+            </div>
+            <div id="registered-client-wrap" class="hidden space-y-4">
+              <div>
+                <label class="field-label" for="client-search" data-i18n="appointment_search_client">Search client</label>
+                <input id="client-search" type="search" class="field-input" data-i18n-placeholder="appointment_search_client_ph" />
+                <p id="client-search-empty" class="hidden mt-2 text-sm text-slate-500"></p>
+                <div id="client-search-results" class="mt-2 space-y-2"></div>
+              </div>
+              <div>
+                <label class="field-label" for="registered-vehicle-select" data-i18n="appointment_select_vehicle">Vehicle</label>
+                <select id="registered-vehicle-select" class="field-input" disabled>
+                  <option value=""></option>
+                </select>
+              </div>
+            </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="field-label" for="first_name" data-i18n="label_first_name">First name</label>
+                <label class="field-label required" for="first_name" data-i18n="label_first_name">First name</label>
                 <input id="first_name" name="first_name" type="text" required class="field-input" data-i18n-placeholder="placeholder_first_name" />
                 <p class="text-xs text-red-600 mt-1 hidden" data-error-for="first_name"></p>
               </div>
               <div>
-                <label class="field-label" for="last_name" data-i18n="label_last_name">Last name</label>
+                <label class="field-label required" for="last_name" data-i18n="label_last_name">Last name</label>
                 <input id="last_name" name="last_name" type="text" required class="field-input" data-i18n-placeholder="placeholder_last_name" />
                 <p class="text-xs text-red-600 mt-1 hidden" data-error-for="last_name"></p>
               </div>
             </div>
             <div>
-              <label class="field-label" data-i18n="label_phone">Phone</label>
+              <label class="field-label required" data-i18n="label_phone">Phone</label>
               <div class="flex rounded-lg border border-slate-300 focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500">
                 <div class="relative">
-                  <button id="phone-code-btn" type="button" class="flex items-center gap-0.5 h-full px-2 py-2 text-sm font-medium bg-white hover:bg-slate-50 border-r border-slate-300 rounded-l-lg focus:outline-none whitespace-nowrap" data-value="+506">🇨🇷 +506 <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg></button>
+                  <button id="phone-code-btn" type="button" class="flex items-center gap-0.5 h-full px-2 py-2 text-sm font-medium bg-white hover:bg-slate-50 border-r border-slate-300 rounded-l-lg focus:outline-none whitespace-nowrap" data-value="+506">🇨🇷 +506 <img class="w-3 h-3 ml-0.5" src="/icons/chevron_down.svg" alt="" /></button>
                   <div id="phone-code-dropdown" class="hidden absolute z-10 mt-0.5 left-0 w-36 rounded-lg border border-slate-200 bg-white shadow-lg overflow-hidden">
                     <button type="button" class="code-option flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-slate-100 text-left" data-value="+506">🇨🇷 +506</button>
                     <button type="button" class="code-option flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-slate-100 text-left" data-value="+1">🇺🇸 +1</button>
@@ -108,7 +132,7 @@
               <p class="text-xs text-red-600 mt-1 hidden" data-error-for="phone"></p>
             </div>
             <div>
-              <label class="field-label" for="plate" data-i18n="label_plate">Plate number</label>
+              <label class="field-label required" for="plate" data-i18n="label_plate">Plate number</label>
               <input id="plate" name="plate" type="text" required class="field-input uppercase" data-i18n-placeholder="placeholder_plate" />
               <p class="text-xs text-red-600 mt-1 hidden" data-error-for="plate"></p>
             </div>
@@ -121,11 +145,11 @@
               <label class="field-label" for="address" data-i18n="label_address">Address</label>
               <input id="address" name="address" type="text" class="field-input" data-i18n-placeholder="placeholder_address" />
               <button id="share-location" type="button" class="btn-secondary w-full flex items-center justify-center gap-2 mt-2" data-i18n="btn_share_location">
-                <span aria-hidden="true">&#128205;</span> Share current location
+                <img class="w-5 h-5" src="/icons/location.svg" alt="" /> Share current location
               </button>
               <p id="location-status" class="text-xs text-slate-500 mt-1 hidden text-center"></p>
               <a id="maps-link" href="#" target="_blank" rel="noopener" class="hidden mt-2 text-sm text-brand-700 font-medium hover:underline inline-flex items-center gap-1">
-                <span aria-hidden="true">&#128506;</span> <span data-i18n="btn_view_location">View on Google Maps</span>
+                <img class="w-4 h-4" src="/icons/location.svg" alt="" /> <span data-i18n="btn_view_location">View on Google Maps</span>
               </a>
             </div>
           </form>
@@ -140,19 +164,10 @@
 
         <!-- Success -->
         <div id="create-success" class="hidden text-center py-6">
-          <div class="text-5xl mb-3" aria-hidden="true">&#9989;</div>
+          <img class="w-14 h-14 mx-auto mb-3" src="/icons/check.svg" alt="" />
           <h2 class="text-2xl font-bold mb-2" data-i18n="success_title">Appointment booked!</h2>
           <p class="text-slate-500 mb-2" data-i18n="success_message">We will contact you to confirm the appointment and location.</p>
-          <div class="inline-block rounded-xl border-2 border-brand-500 px-6 py-3 mb-6 space-y-2">
-            <div>
-              <div class="text-xs uppercase text-slate-500" data-i18n="your_number">Appointment number</div>
-              <div id="create-appt-number" class="text-lg font-mono font-bold text-brand-700 tracking-wider"></div>
-            </div>
-            <div>
-              <div class="text-xs uppercase text-slate-500" data-i18n="label_plate">Plate number</div>
-              <div id="create-appt-plate" class="text-lg font-mono font-bold text-brand-700 tracking-wider"></div>
-            </div>
-          </div>
+          <div id="create-success-tags" class="flex flex-wrap justify-center gap-2 mb-6"></div>
           <div class="flex items-center justify-center gap-3">
             <a href="/mechanic/create.html" class="btn-secondary" data-i18n="mechanic_create">New appointment</a>
             <a href="/mechanic/dashboard.html" class="btn-primary" data-i18n="mechanic_panel">Mechanic panel</a>
@@ -164,16 +179,13 @@
 
     <div id="loading-overlay" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
       <div class="bg-white rounded-2xl shadow-xl px-8 py-6 flex flex-col items-center gap-3">
-        <svg class="animate-spin h-8 w-8 text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-        </svg>
+        <img class="animate-spin h-8 w-8" src="/icons/spinner.svg" alt="" />
         <span class="text-sm text-slate-600 font-medium" data-i18n="saving">Saving appointment...</span>
       </div>
     </div>
 
     <script src="/shared/i18n.js?v=5"></script>
-    <script src="/shared/api.js?v=5"></script>
+    <script src="/shared/api.js?v=6"></script>
     <script src="/mechanic/app.js?v=5"></script>
     <script>window.PAGE = "create";</script>
   </body>

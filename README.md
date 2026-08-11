@@ -1,440 +1,165 @@
-# Mecánico móvil — Appointment Scheduler
+# Mecánico Móvil — Appointment Scheduler
 
-A self-contained web app for a mobile mechanic business. Clients can schedule
-appointments, check their status, create accounts, and register their own
-vehicles. The mechanic has a multi-user panel (roles: admin / mechanic) with an
-appointment calendar, a vehicle service-history log, announcements, settings, a
-Gmail email integration, and a user-uploaded site logo.
+A self-contained web application for a mobile mechanic business. Clients can book
+appointments, check their status, create accounts and manage their own **garage**
+(appointments, vehicles and repairs). The mechanic has a multi-user panel with an
+appointment calendar, a vehicle service-history log, manual appointment creation,
+client management, announcements, settings, and a Gmail email integration.
 
-## Stack
+> Technical documentation (architecture, database schema, API reference,
+> configuration and deployment) lives in the [`docs/`](docs/) folder.
 
-| Layer       | Technology                                                              |
-|-------------|-------------------------------------------------------------------------|
-| **Backend** | Python 3.11 + FastAPI + SQLAlchemy 2.0 + Pydantic v2                    |
-| **Database**| PostgreSQL 16 (Alpine), persistent volume                                |
-| **Frontend**| Static HTML + vanilla JavaScript + Tailwind CSS 3 (built by nginx)      |
-| **Server**  | nginx (serves static files, reverse-proxies `/api/` to backend)         |
-| **DB admin**| pgAdmin 4 (optional, on port 8080)                                      |
-| **Auth**    | JWT access/refresh tokens, bcrypt password hashing, per-IP rate limits  |
-| **Email**   | Gmail API (OAuth 2.0) with legacy SMTP fallback                         |
-| **Realtime**| Server-Sent Events (SSE) for live appointment/announcement updates      |
-| **i18n**    | Spanish & English, auto-detected from `navigator.language`, manual toggle in the header gear/settings menu |
+---
 
 ## Features
 
-### Public site
-- Home page with **Schedule an appointment**, **Check status** and **My vehicles**
-- 3-step scheduling wizard: date → time → personal details
-- Human-friendly appointment number (e.g. `APT-20260616-0001`)
-- Client accounts: register / login, session tokens, form auto-prefill
-- **My vehicles (Mis vehículos):** logged-in clients can register their vehicles
-  (plate, make, model, year, color and front photo), view their list, and remove
-  them. Registering a vehicle that already exists in the shop **auto-links** the
-  client to the canonical vehicle instead of creating a duplicate.
-- Compact header: when logged out it shows an **Iniciar sesión/Registrarse** button
-  and a gear icon; when logged in it shows **"Hola, {nombre}"** plus the gear icon.
-  The gear menu holds the **language switcher**, **My account** (opens the
-  login/register modal, or shows the profile when logged in) and **Sign out**
-- Optional email on appointment (used for email notifications)
-- Bilingual UI (ES / EN) — auto-detected, manual switcher in the gear menu
-- Calendar grays out past dates, days off, and dates with existing non-cancelled appointments
-- Time slots filtered to show only available times for the selected date
-- Active announcements banner
-- A **Back** button (instead of a plain home link) in the top-left of secondary pages
+### For clients (public site)
 
-### Mechanic panel
-- **First-run setup:** when the panel has no users yet, the login page shows a
-  *"Create admin"* form — the first account ever created becomes the main
-  administrator (role `admin`). The setup form also lets the admin **upload a
-  logo** image; if provided it is stored and shown in the header of every page
-  (otherwise no logo is displayed)
-- Multi-user authentication with **email + password** (JWT access/refresh tokens)
-- Roles: `admin` (full access + user management) and `mechanic`
-- Landing shortcuts (in order): appointment **calendar**, **vehicle history**,
-  manual appointment creation, **clients**, **announcements**, **users** (admin
-  only) and **settings**
-- A **Back** button appears in the top-left of the header on every view
-  (calendar, announcements, settings, clients, users, vehicles, vehicle detail)
-  and returns to the previous view
+- **Book an appointment** with a 3-step wizard: date → time → personal details.
+  The calendar grays out past dates, days off and dates already taken, and only
+  available time slots are shown.
+- **Check appointment status** by phone + plate: view details, edit or cancel.
+- **Client accounts** — register / log in to get a personalized experience.
+- **Mi garaje (My garage)** — a private hub with three sections:
+  - **Citas (Appointments):** a live list of your appointments with their status
+    (updates automatically in real time — no refresh needed).
+  - **Vehículos (Vehicles):** register your vehicles (plate, make, model, year,
+    color and a front photo), view, **edit** or remove them. Registering a plate
+    that already exists in the shop links you to the existing vehicle instead of
+    creating a duplicate.
+  - **Servicios (Historial de servicios):** the full service history of your
+    vehicles. Each record shows the symptom/reparation, diagnosis, mileage with
+    odometer photo, prices in colones or dollars, and extra photos — expand it
+    to see the details. Updates automatically when the mechanic adds or changes
+    records.
+- **Announcements banner** at the top of the site.
+- **Bilingual UI** (Spanish / English) — auto-detected from your browser, with a
+  manual switcher in the header gear menu.
+- Optional email when booking (used for email notifications).
+
+### For the mechanic (panel)
+
+- **First-run setup:** with no accounts yet, the login page shows a *Create
+  admin* form. The first account created becomes the main administrator
+  (`admin`), and it can also **upload a site logo** shown in every header.
+- **Roles:** `admin` (full access + user management + delete clients) and
+  `mechanic`.
+- **Appointment calendar:** month view colored by status; clicking a day lists
+  each appointment with full name, time, plate, number and address, plus quick
+  actions to **confirm, complete, cancel or delete** and an **Edit reservation**
+  picker for extra reserved days. When the appointment's vehicle is registered,
+  a blue **"Ver detalles"** link jumps straight to that vehicle's history.
 - **Vehicle history (Historial de Vehículos):** one canonical vehicle per license
-  plate (normalized, so `ABC-123` and `ABC123` are the same vehicle). Vehicles are
-  keyed by a normalized `plate_key` and can be **owned by multiple clients**
-  (many-to-many via `client_vehicles`); when a client registers a plate that
-  already exists, the client is linked to the same vehicle instead of duplicating
-  it. The list and detail view show the linked **client owner(s)**. Register
-  vehicles with make/model/year/color and a single **front photo** (base64 in DB);
-  then add work visits per vehicle. Each work visit records a **title** (e.g.
-  "Problema de arranque") plus its **date (today is saved automatically)** and
-  is split in two parts: **Assessment (Valoración)**
-  — general state of the vehicle: **mileage photo**, **fuel-level photo**,
-  **condition photos** (front / left / right / rear), **defect/observation
-  photos**, observations and **belongings** (text + photos) — and **Jobs
-  (Trabajos)** — each job with **work photos**, a **diagnostic** and
-  observations. Several records can exist on the **same date** (they are
-   distinguished by their title (titles must be unique per vehicle); when creating a new record the form offers
-  **"Usar fotos de valoración del trabajo anterior"** to reuse the assessment
-  photos of a previous record. The visit list shows each record's **title and
-  creation date**;
-  clicking a visit opens a
-  modal with those two tabs. A new visit is created with the assessment first;
-  jobs are then added manually from the Jobs tab (each job has its own
-  add/edit/delete form). A vehicle can have many visits, shown as a
-  chronological log. Searchable by plate/make/model — like the clients view, the
-  list stays empty with a *"Type to search for a vehicle"* hint until a search
-  term is entered, and shows a *"no results"* message when nothing matches.
-- Appointment status workflow: `pending → confirmed → completed`, plus `cancelled`
-- Manual appointment creation with optional client email
-- Calendar day view lists each appointment with its details in a fixed order:
-  **full name, appointment time (12-hour), plate number, appointment number**
-  and **address/location** (falls back to *"Sin ubicación"* when empty), plus
-  quick actions to confirm, complete, cancel or delete. Each appointment also
-  shows its **reserved time** — computed from the global appointment-time setting
-  (e.g. *"10 de Agosto, 8:00 AM - 10:00 AM (2 hora(s))"* for hours, or
-  *"10 - 11 de Agosto (2 día(s))"* for days) plus any extra reserved days — with
-  an **Edit reservation** button that opens a mini month calendar. There the
-  mechanic can **select/deselect extra reserved days** for that appointment
-  (days already reserved by any other appointment or by the default range are
-  shown as unavailable); saved extra days are blocked on the client booking
-  calendar too
-- **Unified header:** a single gear icon opens a menu with the logged-in user
-  (name + role), the **language switcher**, **My account** (shows name, email and
-  role, plus a button to change the password) and **Sign out**
-- **Settings:** per-day work schedule, days off, and appointment time
-  reservation (in hours or days), all with highlighted button pickers:
-  - **Work days:** start/end times chosen with **hour (1–12)**, **minutes
-    (00–59)** and **am/pm** dropdowns; an optional **lunch break** toggle with its
-    own start/end pickers blocks those slots for clients; changing a start/end
-    time offers **"Apply this schedule to other days?"** with a button per other
-    working day
-  - **Appointment time:** **Unidad** (Horas / Días) and **Tiempo reservado**
-    value buttons with a highlighted active option
-  - **Days off:** a calendar-icon button opens the same month calendar used for
-    client/appointment scheduling; **multiple days can be selected** (working
-    days are shown in green like the client calendar, non-working days are
-    disabled, selected days are highlighted) and added together with an optional
-    reason; the list shows each date in full text (e.g. *Miércoles 8 de Marzo
-    del 2026*)
-- **User management (admin only):** create/edit users, reset passwords, activate/deactivate, delete
-- **Clients view:** list registered clients and send emails to them
-- **Announcements:** create/edit/delete banner messages with a background color
-  and a duration (in hours) or permanent; the history list shows each
-  announcement's **status** (Activo/Inactivo), **remaining time** (hours left,
-  computed from creation time, or *"Sin límite"* for permanent) and the **text**
-- **Gmail integration:** OAuth 2.0 setup to send appointment and test emails from the panel
+  plate, searchable by plate/make/model, showing its owner(s). Each vehicle has
+  a chronological log of **Service History (Historial de Servicios)**. Every
+  record captures a **Síntoma o reparación** (title), **Diagnóstico o notas**,
+  **Kilometraje** (with km/mi unit and a required odometer photo), optional
+  **other photos**, and a list of **Precios** — rows of *mano de obra* (labor)
+  or *repuestos* (parts) entered in **colones (₡)** or **dollars ($)** with
+  automatic thousand separators (e.g. 1,000). Labor total, parts total and
+  grand total are summed automatically. Records can be added, edited and
+  deleted from the panel.
+- **Create appointment (manual):** pick date/time and fill the details. You can
+  create it as a **Guest** or a **Registered client** — searching by name or
+  last name autofills the client's info and lets you pick one of their registered
+  vehicles.
+- **Clients:** search registered clients, **send emails** to them, and (admin
+  only) **delete** them.
+- **Announcements:** create/edit/delete banner messages with a color and a
+  duration (hours) or permanent.
+- **Users (admin only):** create/edit users, reset passwords, activate/deactivate
+  and delete.
+- **Settings:** per-day work schedule (with optional lunch break), **days off**
+  (multi-date calendar picker with reason), and how long each appointment blocks
+  availability (in hours or days).
+- **Gmail integration:** OAuth 2.0 setup to send appointment, client and test
+  emails directly from the panel.
+
+---
 
 ## Quick start
 
 ```bash
-# Edit the .env file first (see Configuration below)
+# 1. Copy and edit the .env file first (see Configuration below)
+# 2. Build and start everything:
 docker compose up -d --build
 ```
 
 Then open:
 
-- **User site:**  http://localhost:8081/
-- **Mechanic:**   http://localhost:8081/mechanic/
-- **pgAdmin:**    http://localhost:8080/   (login with the `PGADMIN_*` env vars)
+| Site        | URL                              |
+|-------------|----------------------------------|
+| Client site | http://localhost:8081/           |
+| Mechanic    | http://localhost:8081/mechanic/  |
+| pgAdmin     | http://localhost:8080/           |
 
-> The first build pulls images and runs `npm install` for Tailwind, so it may take
-> a couple of minutes. Subsequent starts are near-instant.
+> The first build pulls images and runs `npm install` for Tailwind, so it may
+> take a couple of minutes. Subsequent starts are near-instant.
 
 **First use of the mechanic panel:** open `/mechanic/` with no users in the
 database and you will be asked to create the administrator account (name, email,
-password, and optionally **upload a logo**). That first account has the `admin`
-role.
+password, and optionally upload a logo). That first account has the `admin` role.
 
-## Configuration
+---
 
-All settings come from environment variables (see `.env`):
+## How to use the app
 
-| Variable                  | Default        | Description                              |
-|---------------------------|----------------|------------------------------------------|
-| `POSTGRES_USER`           | `mechanic`     | Postgres role                            |
-| `POSTGRES_PASSWORD`       | `changeme`     | Postgres password                        |
-| `POSTGRES_DB`             | `appointments` | Database name                            |
-| `PGADMIN_DEFAULT_EMAIL`   | `admin@local.com` | pgAdmin login email                   |
-| `PGADMIN_DEFAULT_PASSWORD`| `changeme`     | pgAdmin login password                  |
-| `PGADMIN_PORT`            | `8080`         | Host port for pgAdmin                    |
-| `FRONTEND_PORT`           | `8081`         | Host port for the user/mechanic site     |
-| `ALLOWED_ORIGINS`         | `http://localhost:8081,http://localhost:8080` | CORS allow-list |
-| `SITE_URL`                | `http://localhost:8081` | Public base URL (used for the Gmail OAuth redirect) |
-| `JWT_SECRET`              | `changeme-secret-key` | Secret used to sign JWT tokens       |
-| `ACCESS_TOKEN_MINUTES`    | `60`           | Access token lifetime (minutes)         |
-| `REFRESH_TOKEN_DAYS`      | `30`           | Refresh token lifetime (days)           |
-| `EMAIL_ADDRESS`           | *(empty)*      | Legacy SMTP sender address (fallback)   |
-| `EMAILAPP_PASSWORD`       | *(empty)*      | Legacy SMTP app password (fallback)     |
-| `RATE_LIMIT_MAX`          | `20`           | Max requests per window per IP          |
-| `RATE_LIMIT_WINDOW`       | `60`           | Rate-limit window (seconds)             |
+### As a client
 
-**Change `POSTGRES_PASSWORD`, `JWT_SECRET`, and the pgAdmin password before
-deploying anywhere real.** The mechanic panel no longer uses a shared password —
-accounts are created on first run and managed by the admin.
+1. Open the site root (`/`).
+2. **Agendar cita (Schedule):** pick a date, then a time, then enter your
+   details (first name, last name, phone, plate, optional email and address).
+   You'll get an appointment number (e.g. `APT-20260616-0001`).
+3. **Consultar cita (Status):** enter the phone and plate used when booking to
+   see the appointment, edit it or cancel it.
+4. **Mi garaje (My garage):** sign in (or register) to open your garage:
+   - **Citas** — view all your appointments and their status.
+   - **Vehículos** — add, edit (gear menu) or remove your vehicles.
+   - **Servicios** — open a vehicle's service history and expand each record to
+     see the diagnosis, mileage photo, prices and photos.
+5. Switch the language with the gear icon in the top-right corner.
 
-## Database
+### As the mechanic
 
-- **Engine:** PostgreSQL 16
-- **Connection:** `postgresql+psycopg2://mechanic:PASSWORD@db:5432/appointments`
-- **ORM:** SQLAlchemy 2.0 (declarative mapping with `mapped_column`)
-- **Volume:** `pgdata` — persists across container restarts
-- **Health check:** `pg_isready` every 5s before the backend starts
+1. Open `/mechanic/`. On first run, create the admin account; otherwise sign in
+   with your email and password.
+2. From the landing page use the shortcuts:
+   - **Calendario de citas** — manage appointments day by day (confirm, complete,
+     cancel, delete, edit reservations, jump to vehicle details).
+   - **Historial de Vehículos** — search vehicles and open their service-history
+     log; register new vehicles and add service records (symptom/repair,
+     diagnosis, mileage + photo, and price rows).
+   - **+** — create an appointment manually (Guest or Registered client).
+   - **Clientes** — search clients, send them emails, and (as admin) delete them.
+   - **Anuncios** — publish banner announcements.
+   - **Usuarios** (admin only) — manage panel accounts.
+   - **Configuración** — work schedule, days off, appointment time, Gmail.
 
-### Tables
+---
 
-**`appointments`** — client appointment requests:
+## Documentation
 
-| Column              | Type          | Notes                                |
-|---------------------|---------------|--------------------------------------|
-| `id`                | `INTEGER`     | Primary key, auto-increment          |
-| `appointment_number`| `VARCHAR(20)` | Unique, e.g. `APT-20260616-0001`     |
-| `first_name`        | `VARCHAR(100)`|                                      |
-| `last_name`         | `VARCHAR(100)`|                                      |
-| `phone`             | `VARCHAR(30)` |                                      |
-| `country_code`      | `VARCHAR(10)` | e.g. `+506`, `+1` (normalized)       |
-| `email`             | `VARCHAR(255)`| Optional, used for notifications     |
-| `plate`             | `VARCHAR(20)` | License plate (uppercased on submit) |
-| `address`           | `TEXT`        |                                      |
-| `appointment_date`  | `DATE`        |                                      |
-| `appointment_time`  | `TIME`        |                                      |
-| `reserved_dates`    | `JSON`        | Extra specific days (ISO) this appointment is reserved on |
-| `status`            | `VARCHAR(20)` | `pending` / `confirmed` / `completed` / `cancelled` |
-| `created_at` / `updated_at` | `TIMESTAMPTZ` | Auto-managed timestamps    |
+Detailed technical documentation is organized under [`docs/`](docs/):
 
-Other tables:
+| Document                          | Contents                                        |
+|-----------------------------------|-------------------------------------------------|
+| [Architecture](docs/architecture.md) | System components, request flow, auth, realtime |
+| [Database](docs/database.md)         | Engine, tables, columns and relationships        |
+| [API Reference](docs/api.md)         | All REST endpoints grouped by area               |
+| [Configuration](docs/configuration.md) | Environment variables and secrets             |
+| [Deployment](docs/deployment.md)      | Build, run, reset, pgAdmin, production notes    |
+| [Development](docs/development.md)   | Project layout, build steps, conventions        |
 
-- **`clients`** — public site accounts (name, email unique, phone, bcrypt hash)
-- **`users`** — mechanic panel accounts (`role` admin/mechanic, `is_active`)
-- **`announcements`** — banner messages with color and duration
-- **`work_schedule`** — per-day start/end times plus optional lunch break (JSON)
-- **`days_off`** — non-working dates
-- **`appointment_time_settings`** — how long each appointment blocks availability (unit: hours/days)
-- **`gmail_settings`** — Gmail OAuth credentials and state (singleton row `id=1`)
-- **`site_settings`** — site-wide settings (singleton row `id=1`); stores the
-  uploaded `logo_data_url` (base64) shown in every page header
-- **`vehicles`** — canonical vehicle cards keyed by normalized `plate_key`
-  (unique, uppercase without spaces/dashes); `plate` is kept for display. Single
-  front photo stored as base64 text. Vehicles are shared across the mechanic and
-  multiple clients via `client_vehicles`
-- **`client_vehicles`** — many-to-many link between `clients` and `vehicles`
-  (unique per client/vehicle pair). Registering a plate that already exists links
-  the client instead of duplicating the vehicle; a client "delete" only unlinks
-- **`vehicle_visits`** — work records (title, date, mileage photo, fuel-level photo, condition photos front/left/right/rear, defects/observations photos, observations, belongings + belongings photos, jobs with photos + diagnostic + observations) per vehicle (FK `vehicles.id`, cascade delete)
+---
 
-## Gmail integration (optional)
+## Tech stack (overview)
 
-To send emails (appointment notifications, client emails, test emails):
-
-1. In the [Google Cloud Console](https://console.cloud.google.com) enable the
-   **Gmail API** and create an **OAuth 2.0 Client ID** of type *Web*.
-2. Add an **Authorized redirect URI** equal to
-   `SITE_URL` + `/api/mechanic/gmail/callback`
-   (e.g. `http://localhost:8081/api/mechanic/gmail/callback`).
-3. In the mechanic panel go to **Settings → Integrations → Gmail**, enter the
-   Client ID, Client Secret, and the sender Gmail address, save, and click
-   **Authorize with Google**.
-4. Use the **Send test email** button to verify.
-
-> If Gmail is not configured, the legacy SMTP fallback (`EMAIL_ADDRESS` /
-> `EMAILAPP_PASSWORD`) is used, otherwise sending is skipped silently.
-
-## Reset (drop all data)
-
-```bash
-docker compose down -v
-docker compose up -d --build
-```
-
-This wipes the database, so the mechanic panel will ask you to create the admin
-again on next start.
-
-## Connecting pgAdmin to the database
-
-After pgAdmin loads:
-
-1. Right-click **Servers** → **Register** → **Server…**
-2. **General** tab: any name (e.g. `mechanic-db`)
-3. **Connection** tab:
-   - Host: `db`
-   - Port: `5432`
-   - Maintenance DB: `appointments`
-   - Username: `POSTGRES_USER`
-   - Password: `POSTGRES_PASSWORD`
-
-## Project layout
-
-```
-.
-├── docker-compose.yml           # Services: db, pgadmin, backend, frontend
-├── .env                         # Environment variable configuration
-│
-├── backend/                     # FastAPI Python service
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── translations/            # Server-side i18n JSON files
-│   │   ├── es.json
-│   │   └── en.json
-│   └── app/
-│       ├── main.py              # FastAPI app, CORS, startup migrations
-│       ├── config.py            # Settings from env vars
-│       ├── database.py          # SQLAlchemy engine + session factory
-│       ├── models.py            # ORM models (all tables)
-│       ├── schemas.py           # Pydantic request/response models
-│       ├── deps.py              # Auth dependencies (mechanic/admin/client)
-│       ├── security.py          # bcrypt password hashing
-│       ├── token.py             # JWT creation/validation (audience + type)
-│       ├── ratelimit.py         # In-memory per-IP rate limiter
-│       ├── crud.py              # Database queries
-│       ├── email_sender.py      # Gmail API (OAuth2) + SMTP fallback
-│       ├── event_manager.py     # SSE pub/sub
-│       ├── i18n.py              # Server-side translation helper
-│       └── routers/
-│           ├── public.py        # Public endpoints (appointments, schedule, announcements, site settings)
-│           ├── client_auth.py   # Client register / login / refresh / me / vehicles
-│           ├── mechanic.py      # Panel auth, users, gmail, appointments, settings
-│           ├── events.py        # SSE stream
-│           └── i18n_router.py   # Translation file endpoint
-│
-└── frontend/                    # Static site served by nginx
-    ├── Dockerfile               # Multi-stage: builds Tailwind, then copies to nginx
-    ├── nginx.conf               # Reverse-proxy /api/, static file serving
-    ├── package.json             # Tailwind CSS + PostCSS dev dependencies
-    ├── tailwind.config.js
-    ├── postcss.config.js
-    ├── src/input.css            # Tailwind source entry
-    ├── locales/                 # Client-side i18n JSON (ES / EN)
-    ├── shared/                  # Shared frontend assets
-    │   ├── api.js               # Fetch wrapper — auto-prepends /api/, JSON parse
-    │   ├── auth.js              # Client header + login/register modal (public site)
-    │   ├── i18n.js              # Client-side translation engine
-    │   └── styles.css           # Built Tailwind output
-    ├── user/                    # User-facing pages
-    │   ├── index.html            # Home (schedule / check status / my vehicles)
-    │   ├── schedule.html         # 3-step appointment wizard
-    │   ├── status.html           # Appointment lookup form + result card
-    │   └── vehicles.html         # My vehicles (register / list / remove)
-    └── mechanic/                # Mechanic panel pages
-        ├── index.html            # Login / first-run admin setup
-        ├── dashboard.html        # Appointments, calendar, announcements, clients,
-        │                          # users, settings (schedule with button pickers,
-        │                          # calendar-based days off, appointment time,
-        │                          # Gmail integration), gear menu header
-        └── create.html           # Manual appointment creation
-```
-
-## API reference
-
-### Public (no auth)
-
-| Method | Endpoint                        | Description                            |
-|--------|---------------------------------|----------------------------------------|
-| POST   | `/api/appointments`             | Create a new appointment (rate-limited)|
-| GET    | `/api/appointments/taken-dates?year=&month=&exclude=` | ISO dates with bookings (1-indexed month); optional `exclude` = appointment number whose own date/time stays selectable (used when editing) |
-| GET    | `/api/appointments/times?for_date=` | Taken time slots for a date         |
-| GET    | `/api/appointments/lookup?phone=&plate=` | Lookup appointment by phone + plate |
-| PUT    | `/api/appointments/{number}`    | Update appointment                    |
-| PATCH  | `/api/appointments/{number}/cancel` | Cancel appointment                 |
-| GET    | `/api/schedule`                 | Current work schedule                 |
-| GET    | `/api/announcements/active`     | Active announcement banner            |
-| GET    | `/api/site/settings`            | Site settings (e.g. `logo_data_url`)  |
-| GET    | `/api/health`                   | Health check                          |
-
-### Client auth (`/api/auth`)
-
-| Method | Endpoint     | Description                            |
-|--------|--------------|----------------------------------------|
-| POST   | `/register`  | Register a client account              |
-| POST   | `/login`     | Login (returns access + refresh token) |
-| POST   | `/refresh`   | Exchange refresh token for a new access token |
-| GET    | `/me`        | Current client profile (Bearer token)  |
-| GET    | `/vehicles`  | List my vehicles                       |
-| POST   | `/vehicles`  | Register a vehicle (creates or **auto-links** to an existing one by plate) |
-| DELETE | `/vehicles/{id}` | **Unlink** my vehicle (canonical vehicle and its visits are kept) |
-
-### Mechanic (`/api/mechanic`) — requires `X-Mechanic-Key` header (JWT), except `bootstrap` and `login`
-
-| Method | Endpoint                        | Description                            |
-|--------|---------------------------------|----------------------------------------|
-| GET    | `/bootstrap`                    | `{ needs_setup }` — true when no users exist |
-| POST   | `/bootstrap`                    | Create the first admin (only when no users exist) |
-| POST   | `/login`                        | Login with email + password            |
-| POST   | `/refresh`                      | Refresh tokens                         |
-| GET    | `/me`                           | Current user profile                   |
-| PUT    | `/me/password`                  | Change own password                    |
-| GET    | `/users` *(admin)*              | List panel users                       |
-| POST   | `/users` *(admin)*              | Create user                            |
-| PUT    | `/users/{id}` *(admin)*         | Update user (name/role/is_active)      |
-| POST   | `/users/{id}/reset-password` *(admin)* | Reset a user's password          |
-| DELETE | `/users/{id}` *(admin)*         | Delete user                            |
-| GET    | `/gmail/settings`               | Gmail integration settings             |
-| PUT    | `/gmail/settings`               | Save Gmail client credentials          |
-| GET    | `/gmail/auth-url`               | Get Google OAuth authorization URL     |
-| GET    | `/gmail/callback`               | OAuth redirect callback (no auth)      |
-| POST   | `/gmail/test`                   | Send a test email                      |
-| POST   | `/gmail/deactivate`             | Deactivate Gmail integration           |
-| GET    | `/clients`                      | List registered clients                |
-| POST   | `/emails/send`                  | Send an email to a recipient           |
-| GET    | `/appointments?status=&date_from=` | List appointments (optional status filter and date_from) |
-| POST   | `/appointments`                 | Create appointment (manual)            |
-| PATCH  | `/appointments/{number}`        | Update status (e.g. `{"status":"confirmed"}`) |
-| PUT    | `/appointments/{number}/reservation` | Update extra reserved days (`{"reserved_dates":["YYYY-MM-DD",...]}`) |
-| DELETE | `/appointments/{number}`        | Delete an appointment                  |
-| GET    | `/calendar?year=&month=`        | Calendar bookings for a month          |
-| GET    | `/announcements`                | List announcements                     |
-| POST   | `/announcements`                | Create announcement                    |
-| PUT    | `/announcements/{id}`           | Update announcement                    |
-| DELETE | `/announcements/{id}`           | Delete announcement                    |
-| GET/PUT| `/schedule`                     | Get / update work schedule             |
-| GET    | `/days-off`                     | List days off                          |
-| POST   | `/days-off`                     | Add a day off                          |
-| DELETE | `/days-off/{date}`              | Remove a day off                       |
-| GET/PUT| `/appointment-time`             | Get / update appointment time settings |
-| GET/PUT| `/settings/site`                 | Get / update site settings (uploaded logo) |
-| GET    | `/vehicles?q=`                 | Search vehicles by plate/make/model     |
-| POST   | `/vehicles`                    | Register a vehicle                      |
-| GET    | `/vehicles/{id}`               | Vehicle detail (photos, visits, owners) |
-| PUT    | `/vehicles/{id}`               | Update a vehicle                        |
-| DELETE | `/vehicles/{id}`               | Delete a vehicle and its visits         |
-| POST   | `/vehicles/{id}/visits`        | Add a work record to a vehicle          |
-| PUT    | `/visits/{id}`                 | Update a work record                    |
-| DELETE | `/visits/{id}`                 | Delete a work record                    |
-
-### Realtime
-
-| Method | Endpoint        | Description                            |
-|--------|-----------------|----------------------------------------|
-| GET    | `/api/events/stream` | Server-Sent Events: `appointment`, `announcement` |
-
-## Architecture notes
-
-- **nginx** serves the static frontend and proxies `/api/` requests to the backend container.
-- The database is only accessible from within the Docker network — the backend connects via the internal hostname `db`.
-- The mechanic panel uses **JWT tokens**: the access token is sent on every request via the `X-Mechanic-Key` header and stored in `localStorage`; refresh tokens extend the session. Client tokens use the standard `Authorization: Bearer` header.
-- Passwords are hashed with **bcrypt** (unique salt per user).
-- **Rate limiting** is applied per IP (in-memory) on public form submissions, login, and bootstrap endpoints.
-- Calendar availability is computed on the fly: the frontend fetches taken dates (and taken times per date) from the API and disables those cells client-side.
-- The **appointment time** setting controls how each booking blocks availability: in *hours* the day stays available with fewer slots; in *days* the booked day (and following ones) become unavailable.
-- Time slots use 12-hour labels (`8:00am`, `2:00pm`, etc.) but are stored and transmitted in 24-hour format.
-- The backend exposes a global `RequestValidationError` handler so Pydantic
-  validation failures return a clean message (e.g. `invalid email format`) instead
-  of the raw `body.email: Value error, ...` detail; the client also validates the
-  email format before submitting to avoid a server round-trip.
-- Setting controls (appointment time, work-day hours) use **highlighted button
-  groups** instead of native `<select>` dropdowns for a consistent look; the
-  active option is rendered with the brand color (`bg-brand-600`).
-- The **days-off** calendar picker reuses the same calendar look as the client and
-  calendar views (month navigation, weekday headers, day grid) to keep the UI
-  consistent across the app.
-- Vehicles are **canonical**: a normalized `plate_key` (uppercase, non-alphanumerics
-  removed) is the unique identity, so formatting differences (`ABC-123` vs
-  `ABC123`) never create duplicates. Ownership is a **many-to-many** via
-  `client_vehicles`; client registration auto-links to an existing vehicle and a
-  client delete only unlinks. The mechanic panel shows the linked owners.
-- Each appointment can hold **extra reserved days** (`reserved_dates` JSON).
-  Those days are added to the taken dates returned to the client calendar, so
-  they cannot be booked by other clients.
-- The site **logo** is uploaded during first-run setup (or via
-  `/api/mechanic/settings/site`) and stored as a base64 data URL in the
-  `site_settings` singleton; every header `<img data-site-logo>` loads it from
-  the public `/api/site/settings` endpoint, hiding when none is set.
-- Emails are sent through the **Gmail API** when activated; otherwise the legacy SMTP settings are used as a fallback, and if neither is configured, sending is skipped without error.
-- Translations exist in two places: the backend `translations/` folder (for API error messages) and the frontend `locales/` folder (for UI strings). Both should be kept in sync.
-- The frontend Docker image uses a multi-stage build: `node:20-alpine` builds Tailwind, then the output is copied into an `nginx:alpine` image for serving.
+| Layer        | Technology                                                        |
+|--------------|-------------------------------------------------------------------|
+| **Backend**  | Python 3.11 + FastAPI + SQLAlchemy 2.0 + Pydantic v2              |
+| **Database** | PostgreSQL 16 (persistent volume)                                 |
+| **Frontend** | Static HTML + vanilla JavaScript + Tailwind CSS 3                 |
+| **Server**   | nginx (static files + reverse-proxy for `/api/`)                  |
+| **Auth**     | JWT access/refresh tokens, bcrypt hashing, per-IP rate limits     |
+| **Realtime** | Server-Sent Events (SSE) for live updates                         |
+| **i18n**     | Spanish & English (frontend `locales/` + backend `translations/`) |

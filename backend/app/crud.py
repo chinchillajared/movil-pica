@@ -1,15 +1,11 @@
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import select, desc, func
+from sqlalchemy import or_, select, desc, func
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from . import models, schemas
-
-
-class DuplicateVisitTitleError(ValueError):
-    pass
 
 
 def _generate_number(db: Session, for_date: date) -> str:
@@ -76,6 +72,25 @@ def list_appointments(
         stmt = stmt.where(models.Appointment.status == status)
     if date_from:
         stmt = stmt.where(models.Appointment.appointment_date >= date_from)
+    return db.execute(stmt).scalars().all()
+
+
+def list_client_appointments(
+    db: Session, client: models.Client
+) -> list[models.Appointment]:
+    stmt = (
+        select(models.Appointment)
+        .where(
+            or_(
+                models.Appointment.email == client.email,
+                models.Appointment.phone == client.phone,
+            )
+        )
+        .order_by(
+            models.Appointment.appointment_date.desc(),
+            models.Appointment.appointment_time.desc(),
+        )
+    )
     return db.execute(stmt).scalars().all()
 
 
@@ -432,6 +447,14 @@ def list_clients(db: Session) -> list[models.Client]:
     return list(db.execute(stmt).scalars().all())
 
 
+def delete_client(db: Session, client_id: int) -> None:
+    obj = db.get(models.Client, client_id)
+    if obj is None:
+        raise ValueError("client not found")
+    db.delete(obj)
+    db.commit()
+
+
 def create_client(
     db: Session, data: schemas.ClientRegister, password_hash: str
 ) -> models.Client:
@@ -479,6 +502,16 @@ def get_user_by_id(db: Session, user_id: int) -> Optional[models.User]:
 
 def list_users(db: Session) -> list[models.User]:
     stmt = select(models.User).order_by(models.User.id.asc())
+    return list(db.execute(stmt).scalars().all())
+
+
+def list_technicians(db: Session) -> list[models.User]:
+    """Active mechanic panel accounts used as selectable technicians."""
+    stmt = (
+        select(models.User)
+        .where(models.User.is_active == True)
+        .order_by(models.User.name.asc())
+    )
     return list(db.execute(stmt).scalars().all())
 
 
@@ -614,15 +647,27 @@ def get_vehicle(db: Session, vehicle_id: int) -> models.Vehicle | None:
     return db.get(models.Vehicle, vehicle_id)
 
 
-def count_vehicle_visits(
+def map_vehicle_ids_by_plate(
+    db: Session, plate_keys: list[str]
+) -> dict[str, int]:
+    """Map normalized plate keys to vehicle ids for the given plate keys."""
+    if not plate_keys:
+        return {}
+    stmt = select(models.Vehicle.plate_key, models.Vehicle.id).where(
+        models.Vehicle.plate_key.in_(plate_keys)
+    )
+    return dict(db.execute(stmt).all())
+
+
+def count_vehicle_service_records(
     db: Session, vehicle_ids: list[int]
 ) -> dict[int, int]:
     if not vehicle_ids:
         return {}
     stmt = (
-        select(models.VehicleVisit.vehicle_id, func.count(models.VehicleVisit.id))
-        .where(models.VehicleVisit.vehicle_id.in_(vehicle_ids))
-        .group_by(models.VehicleVisit.vehicle_id)
+        select(models.ServiceRecord.vehicle_id, func.count(models.ServiceRecord.id))
+        .where(models.ServiceRecord.vehicle_id.in_(vehicle_ids))
+        .group_by(models.ServiceRecord.vehicle_id)
     )
     return dict(db.execute(stmt).all())
 
@@ -727,6 +772,20 @@ def list_vehicles_by_client(db: Session, client_id: int) -> list[models.Vehicle]
     return list(db.execute(stmt).scalars().all())
 
 
+def get_client_vehicle(
+    db: Session, client_id: int, vehicle_id: int
+) -> models.Vehicle | None:
+    stmt = (
+        select(models.Vehicle)
+        .join(models.ClientVehicle, models.ClientVehicle.vehicle_id == models.Vehicle.id)
+        .where(
+            models.ClientVehicle.client_id == client_id,
+            models.Vehicle.id == vehicle_id,
+        )
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
 def unlink_client_vehicle(
     db: Session, client_id: int, vehicle_id: int
 ) -> None:
@@ -778,94 +837,104 @@ def delete_vehicle(db: Session, vehicle_id: int) -> None:
     db.commit()
 
 
-def create_visit(
-    db: Session, vehicle_id: int, data: schemas.VehicleVisitCreate
-) -> models.VehicleVisit:
+# --------------------------------------------------------------------------
+# Service history (Historial de Servicios)
+# --------------------------------------------------------------------------
+def list_service_records_for_vehicles(
+    db: Session, vehicle_ids: list[int]
+) -> list[models.ServiceRecord]:
+    if not vehicle_ids:
+        return []
+    stmt = (
+        select(models.ServiceRecord)
+        .options(selectinload(models.ServiceRecord.price_rows))
+        .where(models.ServiceRecord.vehicle_id.in_(vehicle_ids))
+        .order_by(
+            models.ServiceRecord.created_at.desc(),
+            models.ServiceRecord.id.desc(),
+        )
+    )
+    return db.execute(stmt).scalars().all()
+
+
+def create_service_record(
+    db: Session, vehicle_id: int, data: schemas.ServiceRecordCreate
+) -> models.ServiceRecord:
     if db.get(models.Vehicle, vehicle_id) is None:
         raise ValueError("vehicle not found")
-    visit_date = data.visit_date or date.today()
-    title = data.title.strip()
-    title_conflict = (
-        db.query(models.VehicleVisit.id)
-        .filter(
-            models.VehicleVisit.vehicle_id == vehicle_id,
-            func.lower(models.VehicleVisit.title) == title.lower(),
-        )
-        .first()
-    )
-    if title_conflict is not None:
-        raise DuplicateVisitTitleError("a visit with this title already exists")
-    obj = models.VehicleVisit(
+    obj = models.ServiceRecord(
         vehicle_id=vehicle_id,
-        visit_date=visit_date,
-        title=title,
+        title=data.title.strip(),
+        diagnosis=data.diagnosis,
+        mileage=data.mileage,
+        mileage_unit=data.mileage_unit,
         mileage_photo=data.mileage_photo,
-        fuel_level_photo=data.fuel_level_photo,
-        condition_photos=data.condition_photos,
-        defect_photos=data.defect_photos,
-        observations=data.observations,
-        belongings=data.belongings,
-        belongings_photos=data.belongings_photos,
-        jobs=[j.model_dump() for j in data.jobs],
+        other_photos=data.other_photos,
     )
     db.add(obj)
-    db.commit()
-    db.refresh(obj)
-    return obj
-
-
-def get_visit(db: Session, visit_id: int) -> models.VehicleVisit | None:
-    return db.get(models.VehicleVisit, visit_id)
-
-
-def update_visit(
-    db: Session, visit_id: int, data: schemas.VehicleVisitUpdate
-) -> models.VehicleVisit:
-    obj = db.get(models.VehicleVisit, visit_id)
-    if obj is None:
-        raise ValueError("visit not found")
-    if data.title is not None:
-        new_title = data.title.strip()
-        title_conflict = (
-            db.query(models.VehicleVisit.id)
-            .filter(
-                models.VehicleVisit.vehicle_id == obj.vehicle_id,
-                models.VehicleVisit.id != obj.id,
-                func.lower(models.VehicleVisit.title) == new_title.lower(),
+    db.flush()
+    for row in data.price_rows:
+        db.add(
+            models.ServicePriceRow(
+                record_id=obj.id,
+                kind=row.kind,
+                currency=row.currency,
+                description=row.description,
+                amount=row.amount,
             )
-            .first()
         )
-        if title_conflict is not None:
-            raise DuplicateVisitTitleError("a visit with this title already exists")
-        obj.title = new_title
-    fields = [
-        "visit_date",
-        "mileage_photo",
-        "fuel_level_photo",
-        "condition_photos",
-        "defect_photos",
-        "observations",
-        "belongings",
-        "belongings_photos",
-        "jobs",
-    ]
-    for field in fields:
-        val = getattr(data, field, None)
-        if val is not None:
-            if field in ("condition_photos", "defect_photos", "belongings_photos"):
-                setattr(obj, field, list(val) if isinstance(val, list) else dict(val))
-            elif field == "jobs":
-                setattr(obj, field, [j.model_dump() for j in val])
-            else:
-                setattr(obj, field, val)
     db.commit()
     db.refresh(obj)
     return obj
 
 
-def delete_visit(db: Session, visit_id: int) -> None:
-    obj = db.get(models.VehicleVisit, visit_id)
+def get_service_record(
+    db: Session, record_id: int
+) -> models.ServiceRecord | None:
+    stmt = (
+        select(models.ServiceRecord)
+        .options(selectinload(models.ServiceRecord.price_rows))
+        .where(models.ServiceRecord.id == record_id)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def update_service_record(
+    db: Session, record_id: int, data: schemas.ServiceRecordUpdate
+) -> models.ServiceRecord:
+    obj = get_service_record(db, record_id)
     if obj is None:
-        raise ValueError("visit not found")
+        raise ValueError("record not found")
+    if data.title is not None:
+        obj.title = data.title.strip()
+    if data.diagnosis is not None:
+        obj.diagnosis = data.diagnosis
+    if data.mileage is not None:
+        obj.mileage = data.mileage
+    if data.mileage_unit is not None:
+        obj.mileage_unit = data.mileage_unit
+    if data.mileage_photo is not None:
+        obj.mileage_photo = data.mileage_photo
+    if data.other_photos is not None:
+        obj.other_photos = data.other_photos
+    if data.price_rows is not None:
+        obj.price_rows = [
+            models.ServicePriceRow(
+                kind=row.kind,
+                currency=row.currency,
+                description=row.description,
+                amount=row.amount,
+            )
+            for row in data.price_rows
+        ]
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+def delete_service_record(db: Session, record_id: int) -> None:
+    obj = get_service_record(db, record_id)
+    if obj is None:
+        raise ValueError("record not found")
     db.delete(obj)
     db.commit()

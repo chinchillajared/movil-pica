@@ -76,6 +76,19 @@ function statusKey(status) {
   return "status_" + status;
 }
 
+function htmlEscape(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+
+function buildInfoTag(label, value) {
+  var tag = document.createElement("span");
+  tag.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 bg-white text-sm";
+  tag.innerHTML = "<span class='font-bold text-slate-800'>" + htmlEscape(label) + "</span> <span class='text-slate-600'>" + htmlEscape(value == null || value === "" ? "—" : value) + "</span>";
+  return tag;
+}
+
 function initSchedule() {
   setupPhoneCodeDropdown();
   var state = { dateStr: "", hour: "" };
@@ -429,7 +442,7 @@ function initSchedule() {
       return;
     }
     locBtn.disabled = true;
-    locBtn.innerHTML = '<span aria-hidden="true">&#8987;</span> Locating...';
+    locBtn.innerHTML = '<img class="w-5 h-5 animate-spin" src="/icons/spinner.svg" alt="" /> Locating...';
     locStatus.classList.add("hidden");
 
     navigator.geolocation.getCurrentPosition(
@@ -437,14 +450,14 @@ function initSchedule() {
         var coords = pos.coords.latitude.toFixed(6) + "," + pos.coords.longitude.toFixed(6);
         addressInput.value = coords;
         updateMapsLink();
-        locBtn.innerHTML = '<span aria-hidden="true">&#9989;</span> Location shared';
+        locBtn.innerHTML = '<img class="w-5 h-5" src="/icons/check.svg" alt="" /> Location shared';
         locBtn.className = "btn-secondary w-full flex items-center justify-center gap-2 !border-green-500 !text-green-700";
         locStatus.textContent = coords;
         locStatus.className = "text-xs text-slate-500 mt-1 text-center font-mono";
       },
       function () {
         locBtn.disabled = false;
-        locBtn.innerHTML = '<span aria-hidden="true">&#128205;</span> Share current location';
+        locBtn.innerHTML = '<img class="w-5 h-5" src="/icons/location.svg" alt="" /> Share current location';
         locStatus.textContent = "Could not get location. Try again.";
         locStatus.className = "text-xs text-red-600 mt-1 text-center";
       }
@@ -505,8 +518,10 @@ function initSchedule() {
       }
       [1, 2, 3].forEach(function (i) { document.getElementById("step-" + i).classList.add("hidden"); });
       document.getElementById("step-indicator").classList.add("hidden");
-      document.getElementById("appt-number").textContent = res.appointment_number;
-      document.getElementById("appt-plate").textContent = res.plate;
+      var successTags = document.getElementById("success-tags");
+      successTags.innerHTML = "";
+      successTags.appendChild(buildInfoTag(t("your_number"), res.appointment_number));
+      successTags.appendChild(buildInfoTag(t("label_plate"), res.plate));
       document.getElementById("success-card").classList.remove("hidden");
       hideLoading();
     } catch (err) {
@@ -538,7 +553,7 @@ function initSchedule() {
         state.hour = a.appointment_time.slice(0, 5);
         addressInput.value = a.address || "";
         if (a.address && /^-?\d+\.\d+,-?\d+\.\d+$/.test(a.address)) {
-          locBtn.innerHTML = '<span aria-hidden="true">&#9989;</span> Location shared';
+          locBtn.innerHTML = '<img class="w-5 h-5" src="/icons/check.svg" alt="" /> Location shared';
           locBtn.className = "btn-secondary w-full flex items-center justify-center gap-2 !border-green-500 !text-green-700";
           locStatus.textContent = a.address;
           locStatus.className = "text-xs text-slate-500 mt-1 text-center font-mono";
@@ -587,16 +602,25 @@ function initStatus() {
   var currentAppt = null;
 
   function refreshDisplay(a) {
-    document.getElementById("r-number").textContent = a.appointment_number;
-    document.getElementById("r-name").textContent = a.first_name + " " + a.last_name;
-    document.getElementById("r-phone").textContent = (a.country_code || "+506") + " " + a.phone;
-    document.getElementById("r-plate").textContent = a.plate;
-    document.getElementById("r-date").textContent = formatAppDate(a.appointment_date);
-    document.getElementById("r-time").textContent = to12h(a.appointment_time.slice(0, 5));
-    document.getElementById("r-address").textContent = a.address;
-    var statusEl = document.getElementById("r-status");
     var t = window.I18N.t.bind(window.I18N);
-    statusEl.innerHTML = '<span class="badge ' + statusBadgeClass(a.status) + '">' + t(statusKey(a.status)) + '</span>';
+    var tagsBox = document.getElementById("r-tags");
+    tagsBox.innerHTML = "";
+    var items = [
+      { label: t("label_appointment_number"), value: a.appointment_number },
+      { label: t("field_name"), value: a.first_name + " " + a.last_name },
+      { label: t("label_phone"), value: (a.country_code || "+506") + " " + a.phone },
+      { label: t("label_plate"), value: a.plate },
+      { label: t("field_date"), value: formatAppDate(a.appointment_date) },
+      { label: t("field_time"), value: to12h(a.appointment_time.slice(0, 5)) },
+      { label: t("field_address"), value: a.address || "—" },
+    ];
+    items.forEach(function (it) {
+      tagsBox.appendChild(buildInfoTag(it.label, it.value));
+    });
+    var statusTag = document.createElement("span");
+    statusTag.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 bg-white text-sm";
+    statusTag.innerHTML = "<span class='font-bold text-slate-800'>" + htmlEscape(t("field_status")) + "</span> <span class='badge " + statusBadgeClass(a.status) + "'>" + htmlEscape(t(statusKey(a.status))) + "</span>";
+    tagsBox.appendChild(statusTag);
     currentAppt = a;
     updateActions(a);
   }
@@ -697,28 +721,37 @@ function initVehicles() {
 
   function buildVehicleCard(v) {
     var card = document.createElement("div");
-    card.className = "rounded-xl border border-slate-200 bg-white p-3 flex flex-col";
-    var photo = document.createElement("img");
-    photo.src = v.front_photo || "";
-    photo.alt = v.plate;
-    photo.className = "w-full aspect-square object-cover rounded-2xl border border-slate-200 bg-slate-50" + (v.front_photo ? "" : " hidden");
-    card.appendChild(photo);
+    card.className = "relative rounded-xl border border-slate-200 bg-white p-3 flex flex-col";
 
-    var info = document.createElement("div");
-    info.className = "mt-3 text-sm";
-    var details = [v.make, v.model].filter(Boolean).join(" ");
-    if (v.year) details += " " + v.year;
-    info.innerHTML =
-      "<div class='font-semibold text-slate-800'>" + esc(v.plate) + "</div>" +
-      "<div class='text-slate-500'>" + esc(details) + "</div>" +
-      (v.color ? "<div class='text-slate-500'>" + esc(v.color) + "</div>" : "");
-    card.appendChild(info);
-
-    var del = document.createElement("button");
-    del.type = "button";
-    del.className = "mt-3 btn-danger !px-3 !py-1 text-sm self-end";
-    del.textContent = t("vehicles_delete");
-    del.addEventListener("click", function () {
+    var menuWrap = document.createElement("div");
+    menuWrap.className = "absolute top-2 right-2 z-10";
+    var gearBtn = document.createElement("button");
+    gearBtn.type = "button";
+    gearBtn.className = "p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50";
+    gearBtn.innerHTML = '<img class="w-4 h-4" src="/icons/gear.svg" alt="" />';
+    var menu = document.createElement("div");
+    menu.className = "hidden absolute right-0 top-full mt-1 bg-white rounded-xl border border-slate-200 shadow-lg py-1 min-w-[150px] z-20";
+    var editOpt = document.createElement("button");
+    editOpt.type = "button";
+    editOpt.className = "w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50";
+    editOpt.textContent = t("vehicles_edit");
+    var delOpt = document.createElement("button");
+    delOpt.type = "button";
+    delOpt.className = "w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50";
+    delOpt.textContent = t("vehicles_delete");
+    menu.appendChild(editOpt);
+    menu.appendChild(delOpt);
+    function closeMenu() { menu.classList.add("hidden"); document.removeEventListener("click", outside); }
+    function outside(e) { if (!menuWrap.contains(e.target)) closeMenu(); }
+    gearBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      menu.classList.toggle("hidden");
+      if (menu.classList.contains("hidden")) { document.removeEventListener("click", outside); return; }
+      setTimeout(function () { document.addEventListener("click", outside); }, 0);
+    });
+    editOpt.addEventListener("click", function () { closeMenu(); openVehicleModal(v); });
+    delOpt.addEventListener("click", function () {
+      closeMenu();
       showConfirm(t("vehicles_delete_confirm")).then(function (ok) {
         if (!ok) return;
         window.API.auth.deleteVehicle(v.id).then(loadVehicles).catch(function (err) {
@@ -726,7 +759,42 @@ function initVehicles() {
         });
       });
     });
-    card.appendChild(del);
+    menuWrap.appendChild(gearBtn);
+    menuWrap.appendChild(menu);
+    card.appendChild(menuWrap);
+
+    var photo = document.createElement("img");
+    photo.src = v.front_photo || "";
+    photo.alt = v.plate;
+    photo.className = "w-40 h-40 mx-auto object-cover rounded-2xl border border-slate-200 bg-slate-50" + (v.front_photo ? "" : " hidden");
+    card.appendChild(photo);
+
+    var info = document.createElement("div");
+    info.className = "mt-3 flex flex-col gap-1.5 items-start";
+    var items = [
+      { label: t("vehicles_plate"), value: v.plate },
+      { label: t("vehicles_make"), value: v.make || "—" },
+      { label: t("vehicles_model"), value: v.model || "—" },
+      { label: t("vehicles_year"), value: v.year != null ? v.year : "—" },
+      { label: t("vehicles_color"), value: v.color || "—" },
+    ];
+    items.forEach(function (it) {
+      var tag = document.createElement("span");
+      tag.className = "inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 bg-white text-sm w-fit";
+      tag.innerHTML = "<span class='font-bold text-slate-800'>" + esc(it.label) + "</span> <span class='text-slate-600'>" + esc(it.value) + "</span>";
+      info.appendChild(tag);
+    });
+    card.appendChild(info);
+
+    var repairsBtn = document.createElement("a");
+    repairsBtn.href = "/user/repairs.html?vehicle=" + v.id;
+    repairsBtn.className = "btn-secondary flex items-center justify-center gap-2";
+    repairsBtn.innerHTML = esc(t("vehicles_repairs_btn")) + ' <img class="w-5 h-5" src="/icons/wheel.svg" alt="" />';
+    var spacer = document.createElement("div");
+    spacer.className = "mt-auto pt-5";
+    spacer.appendChild(repairsBtn);
+    card.appendChild(spacer);
+
     return card;
   }
 
@@ -735,32 +803,33 @@ function initVehicles() {
     tile.type = "button";
     tile.className = "rounded-xl border-2 border-dashed border-slate-300 bg-white hover:border-brand-400 hover:text-brand-700 text-slate-500 flex flex-col items-center justify-center gap-2 py-10 cursor-pointer";
     tile.innerHTML = "<span class='text-3xl leading-none'>+</span><span class='text-sm font-medium'>" + esc(t("vehicles_add")) + "</span>";
-    tile.addEventListener("click", openAddVehicle);
+    tile.addEventListener("click", function () { openVehicleModal(null); });
     return tile;
   }
 
-  function openAddVehicle() {
+  function openVehicleModal(vehicle) {
+    var editing = !!vehicle;
     var overlay = document.createElement("div");
     overlay.className = "fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto";
     var box = document.createElement("div");
     box.className = "bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8";
     box.innerHTML =
       '<div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">' +
-        '<h3 class="text-lg font-bold text-slate-800">' + esc(t("vehicles_new_title")) + '</h3>' +
+        '<h3 class="text-lg font-bold text-slate-800">' + esc(editing ? t("vehicles_edit_title") : t("vehicles_new_title")) + '</h3>' +
         '<button type="button" id="vehicle-modal-close" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">&times;</button>' +
       '</div>' +
       '<form id="vehicle-form" novalidate class="p-5 space-y-4">' +
         '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
           '<div><label class="field-label" for="v-plate">' + esc(t("label_plate")) + '</label>' +
-            '<input id="v-plate" type="text" required class="field-input uppercase" placeholder="' + esc(t("placeholder_plate")) + '" /></div>' +
+            '<input id="v-plate" type="text" required class="field-input uppercase" value="' + esc(vehicle ? vehicle.plate : "") + '" placeholder="' + esc(t("placeholder_plate")) + '" /></div>' +
           '<div><label class="field-label" for="v-make">' + esc(t("vehicles_make")) + '</label>' +
-            '<input id="v-make" type="text" required class="field-input" placeholder="' + esc(t("vehicles_make_ph")) + '" /></div>' +
+            '<input id="v-make" type="text" required class="field-input" value="' + esc(vehicle ? vehicle.make : "") + '" placeholder="' + esc(t("vehicles_make_ph")) + '" /></div>' +
           '<div><label class="field-label" for="v-model">' + esc(t("vehicles_model")) + '</label>' +
-            '<input id="v-model" type="text" required class="field-input" placeholder="' + esc(t("vehicles_model_ph")) + '" /></div>' +
+            '<input id="v-model" type="text" required class="field-input" value="' + esc(vehicle ? vehicle.model : "") + '" placeholder="' + esc(t("vehicles_model_ph")) + '" /></div>' +
           '<div><label class="field-label" for="v-year">' + esc(t("vehicles_year")) + '</label>' +
-            '<input id="v-year" type="number" min="1900" max="2200" class="field-input" placeholder="' + esc(t("vehicles_year_ph")) + '" /></div>' +
+            '<input id="v-year" type="number" min="1900" max="2200" class="field-input" value="' + (vehicle && vehicle.year ? vehicle.year : "") + '" placeholder="' + esc(t("vehicles_year_ph")) + '" /></div>' +
           '<div class="sm:col-span-2"><label class="field-label" for="v-color">' + esc(t("vehicles_color")) + '</label>' +
-            '<input id="v-color" type="text" class="field-input" placeholder="' + esc(t("vehicles_color_ph")) + '" /></div>' +
+            '<input id="v-color" type="text" class="field-input" value="' + esc(vehicle ? vehicle.color : "") + '" placeholder="' + esc(t("vehicles_color_ph")) + '" /></div>' +
           '<div class="sm:col-span-2"><label class="field-label">' + esc(t("vehicles_photo")) + '</label>' +
             '<div class="flex items-center gap-3">' +
               '<img id="v-photo-preview" alt="" class="hidden h-20 w-28 object-cover rounded-lg border border-slate-200 bg-white" />' +
@@ -781,6 +850,11 @@ function initVehicles() {
     var photoBtn = box.querySelector("#v-photo-btn");
     var err = box.querySelector("#vehicle-form-error");
     var form = box.querySelector("#vehicle-form");
+
+    if (editing && vehicle.front_photo) {
+      preview.src = vehicle.front_photo;
+      preview.classList.remove("hidden");
+    }
 
     function close() { overlay.remove(); }
 
@@ -818,17 +892,21 @@ function initVehicles() {
         return;
       }
       err.classList.add("hidden");
-      window.API.auth.createVehicle({
+      var payload = {
         plate: plate,
         make: make,
         model: model,
         year: yearVal ? parseInt(yearVal, 10) : null,
         color: color,
-        front_photo: photoDataUrl,
-      }).then(function () {
+        front_photo: photoDataUrl || (vehicle ? vehicle.front_photo || "" : ""),
+      };
+      var promise = editing
+        ? window.API.auth.updateVehicle(vehicle.id, payload)
+        : window.API.auth.createVehicle(payload);
+      promise.then(function () {
         close();
         loadVehicles();
-        showMessage(t("vehicles_saved"));
+        showMessage(editing ? t("vehicles_updated") : t("vehicles_saved"));
       }).catch(function (err2) {
         err.textContent = err2.message || t("error_generic");
         err.classList.remove("hidden");
@@ -864,12 +942,306 @@ function $ (id) {
   return document.getElementById(id);
 }
 
+function setupAuthPage(contentId) {
+  var loginRequired = $("login-required");
+  var content = $(contentId);
+  var openLoginBtn = $("btn-open-login");
+  if (openLoginBtn && window.ClientAuth) {
+    openLoginBtn.addEventListener("click", function () {
+      window.ClientAuth.openLogin();
+    });
+  }
+  return function (state) {
+    if (loginRequired) loginRequired.classList.toggle("hidden", state);
+    if (content) content.classList.toggle("hidden", !state);
+  };
+}
+
+function buildAppointmentCard(a, t) {
+  var card = document.createElement("div");
+  card.className = "rounded-xl border border-slate-200 bg-white p-4";
+  var head = document.createElement("div");
+  head.className = "flex flex-wrap items-center gap-2";
+  var num = document.createElement("span");
+  num.className = "font-mono font-bold text-slate-800";
+  num.textContent = a.appointment_number;
+  var badge = document.createElement("span");
+  badge.className = "badge " + statusBadgeClass(a.status);
+  badge.textContent = t(statusKey(a.status));
+  head.appendChild(num);
+  head.appendChild(badge);
+  card.appendChild(head);
+  var tags = document.createElement("div");
+  tags.className = "flex flex-wrap justify-center gap-2 mt-2";
+  tags.appendChild(buildInfoTag(t("cal_plate"), a.plate));
+  tags.appendChild(buildInfoTag(t("field_date"), formatAppDate(a.appointment_date)));
+  tags.appendChild(buildInfoTag(t("field_time"), to12h(String(a.appointment_time).slice(0, 5))));
+  if (a.address) tags.appendChild(buildInfoTag(t("field_address"), a.address));
+  card.appendChild(tags);
+  return card;
+}
+
+function buildRepairCard(r, t) {
+  var card = document.createElement("div");
+  card.className = "rounded-xl border border-slate-200 bg-white p-4";
+
+  var top = document.createElement("div");
+  top.className = "flex flex-wrap items-center justify-between gap-2";
+  var left = document.createElement("div");
+  left.className = "min-w-0";
+  var sym = (r.price_rows && r.price_rows.length) ? currencySymbol(r.price_rows[0].currency || "CRC") : "₡";
+  left.innerHTML =
+    "<div class='flex flex-wrap items-center gap-2'>" +
+      "<span class='font-medium text-slate-800'>" + htmlEscape(r.title || "—") + "</span>" +
+      "<span class='badge badge-completed'>" + htmlEscape(sym + " " + formatMoney(r.total)) + "</span>" +
+    "</div>";
+  var metaTags = document.createElement("div");
+  metaTags.className = "flex flex-wrap justify-center gap-2 mt-2";
+  metaTags.appendChild(buildInfoTag(t("field_date"), formatAppDate(String(r.created_at || "").slice(0, 10))));
+  if (r.mileage != null) metaTags.appendChild(buildInfoTag(t("services_mileage"), r.mileage + " " + (r.mileage_unit || "km")));
+  left.appendChild(metaTags);
+  top.appendChild(left);
+
+  var detailsBtn = document.createElement("button");
+  detailsBtn.type = "button";
+  detailsBtn.className = "text-blue-600 hover:text-blue-800 underline text-sm font-medium";
+  detailsBtn.textContent = t("repairs_view_details");
+  top.appendChild(detailsBtn);
+  card.appendChild(top);
+
+  var details = document.createElement("div");
+  details.className = "hidden mt-4 pt-4 border-t border-slate-200 space-y-3";
+  card.appendChild(details);
+
+  detailsBtn.addEventListener("click", function () {
+    var showing = !details.classList.contains("hidden");
+    details.classList.toggle("hidden", showing);
+    detailsBtn.textContent = showing ? t("repairs_view_details") : t("repairs_hide_details");
+  });
+
+  if (r.mileage_photo) {
+    var mp = document.createElement("div");
+    var mpLabel = document.createElement("p");
+    mpLabel.className = "text-xs font-medium text-slate-500 mb-1";
+    mpLabel.textContent = t("services_mileage_photo");
+    mp.appendChild(mpLabel);
+    var mpImg = document.createElement("img");
+    mpImg.src = r.mileage_photo;
+    mpImg.className = "w-24 h-24 object-cover rounded-lg border border-slate-200 cursor-pointer";
+    mpImg.addEventListener("click", function () { viewPhoto(r.mileage_photo); });
+    mp.appendChild(mpImg);
+    details.appendChild(mp);
+  }
+
+  if (r.diagnosis) details.appendChild(sectionTextBlock(t("services_diagnosis"), r.diagnosis));
+
+  if (r.price_rows && r.price_rows.length) {
+    details.appendChild(buildServicePriceTable(r.price_rows, t));
+  }
+
+  if (r.other_photos && r.other_photos.length) {
+    details.appendChild(photoStrip(t("services_other_photos"), r.other_photos));
+  }
+
+  return card;
+}
+
+function buildServicePriceTable(rows, t) {
+  var wrap = document.createElement("div");
+  var table = document.createElement("table");
+  table.className = "w-full text-sm";
+  var thead = document.createElement("thead");
+  var hr = document.createElement("tr");
+  hr.className = "bg-slate-50 text-slate-500";
+  hr.innerHTML =
+    "<th class='text-left px-3 py-2 font-semibold rounded-l-lg'>" + htmlEscape(t("services_price_type")) + "</th>" +
+    "<th class='text-left px-3 py-2 font-semibold'>" + htmlEscape(t("services_price_description")) + "</th>" +
+    "<th class='text-right px-3 py-2 font-semibold rounded-r-lg'>" + htmlEscape(t("services_price_amount")) + "</th>";
+  thead.appendChild(hr);
+  table.appendChild(thead);
+  var tbody = document.createElement("tbody");
+  rows.forEach(function (row) {
+    var amt = row.amount != null && row.amount !== "" ? Number(row.amount) : 0;
+    var kindLabel = row.kind === "parts" ? t("services_price_parts") : t("services_price_labor");
+    var kindCls = row.kind === "parts" ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800";
+    var tr = document.createElement("tr");
+    tr.className = "border-t border-slate-100";
+    tr.innerHTML =
+      "<td class='px-3 py-2'><span class='text-xs font-semibold px-2 py-0.5 rounded-full " + kindCls + "'>" + htmlEscape(kindLabel) + "</span></td>" +
+      "<td class='px-3 py-2 text-slate-700'>" + htmlEscape(row.description || "—") + "</td>" +
+      "<td class='px-3 py-2 text-right font-medium text-slate-800'>" + htmlEscape(currencySymbol(row.currency || "CRC") + " " + formatMoney(amt)) + "</td>";
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  return wrap;
+}
+
+function formatMoney(n) {
+  if (n == null || isNaN(Number(n))) return "0";
+  var s = Number(n).toFixed(2).replace(/\.?0+$/, "");
+  var parts = s.split(".");
+  var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return intPart + (parts.length > 1 ? "." + parts[1] : "");
+}
+
+function currencySymbol(cur) {
+  return cur === "USD" ? "$" : "₡";
+}
+
+function sectionTextBlock(label, text) {
+  var div = document.createElement("div");
+  div.innerHTML =
+    "<p class='text-xs font-medium text-slate-500 mb-1'>" + htmlEscape(label) + "</p>" +
+    "<p class='text-sm text-slate-700 whitespace-pre-wrap'>" + htmlEscape(text) + "</p>";
+  return div;
+}
+
+function photoStrip(label, sources) {
+  var wrap = document.createElement("div");
+  var h = document.createElement("p");
+  h.className = "text-xs font-medium text-slate-500 mb-1";
+  h.textContent = label;
+  wrap.appendChild(h);
+  var grid = document.createElement("div");
+  grid.className = "flex flex-wrap gap-2";
+  sources.forEach(function (src) {
+    var img = document.createElement("img");
+    img.src = src;
+    img.className = "w-20 h-16 object-cover rounded border border-slate-200 cursor-pointer";
+    img.addEventListener("click", function () { viewPhoto(src); });
+    grid.appendChild(img);
+  });
+  wrap.appendChild(grid);
+  return wrap;
+}
+
+function viewPhoto(src) {
+  if (!src) return;
+  var t = window.I18N ? window.I18N.t.bind(window.I18N) : function (s) { return s; };
+  var overlay = document.createElement("div");
+  overlay.className = "fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4";
+  overlay.innerHTML =
+    '<div class="bg-white rounded-2xl p-2 max-w-full max-h-full overflow-auto">' +
+      '<img class="max-w-full max-h-[85vh] rounded-lg" src="' + htmlEscape(src) + '" />' +
+      '<button type="button" id="photo-close" class="block mx-auto mt-2 px-4 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-medium">' + htmlEscape(t("dialog_close")) + '</button>' +
+    '</div>';
+  function close() { overlay.remove(); }
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+  overlay.querySelector("#photo-close").addEventListener("click", close);
+  document.body.appendChild(overlay);
+}
+
+function initGarage() {
+  var showLoggedIn = setupAuthPage("garage-content");
+  window.API.auth.me().then(function () {
+    showLoggedIn(true);
+  }).catch(function () {
+    showLoggedIn(false);
+  });
+  document.addEventListener("client:login", function () { showLoggedIn(true); });
+}
+
+function initAppointments() {
+  var t = window.I18N ? window.I18N.t.bind(window.I18N) : function (s) { return s; };
+  var showLoggedIn = setupAuthPage("appointments-content");
+  var list = $("appointments-list");
+  var empty = $("appointments-empty");
+  function load() {
+    if (!list) return;
+    list.innerHTML = "";
+    if (empty) empty.classList.add("hidden");
+    window.API.auth.listAppointments().then(function (appts) {
+      showLoggedIn(true);
+      if (!appts || !appts.length) {
+        if (empty) empty.classList.remove("hidden");
+        return;
+      }
+      appts.forEach(function (a) { list.appendChild(buildAppointmentCard(a, t)); });
+    }).catch(function (err) {
+      if (err.status === 401) { showLoggedIn(false); return; }
+      showMessage(err.message || t("error_generic"));
+    });
+  }
+  load();
+  window.refreshAppointments = load;
+  document.addEventListener("client:login", load);
+}
+
+function initRepairs() {
+  var t = window.I18N ? window.I18N.t.bind(window.I18N) : function (s) { return s; };
+  var showLoggedIn = setupAuthPage("repairs-content");
+  var list = $("repairs-list");
+  var empty = $("repairs-empty");
+  var tagsBox = $("vehicle-tags");
+  var params = new URLSearchParams(location.search);
+  var vehicleFilter = params.get("vehicle") ? parseInt(params.get("vehicle"), 10) : null;
+
+  if (vehicleFilter) {
+    var backBtn = document.querySelector("a[data-i18n='btn_back']");
+    if (backBtn) backBtn.href = "/user/vehicles.html";
+    var heading = $("repairs-title");
+    if (heading) heading.textContent = t("repairs_vehicle_title");
+  }
+
+  function renderVehicleTags(vehicles) {
+    if (!tagsBox || !vehicleFilter) return;
+    var v = null;
+    (vehicles || []).forEach(function (x) { if (x.id === vehicleFilter) v = x; });
+    if (!v) { tagsBox.classList.add("hidden"); tagsBox.innerHTML = ""; return; }
+    tagsBox.classList.remove("hidden");
+    tagsBox.innerHTML = "";
+    var items = [
+      { label: t("vehicles_plate"), value: v.plate },
+      { label: t("vehicles_make"), value: v.make || "—" },
+      { label: t("vehicles_model"), value: v.model || "—" },
+      { label: t("vehicles_year"), value: v.year != null ? v.year : "—" },
+      { label: t("vehicles_color"), value: v.color || "—" },
+    ];
+    items.forEach(function (it) {
+      var tag = document.createElement("span");
+      tag.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-sm";
+      tag.innerHTML = "<span class='font-bold text-slate-800'>" + htmlEscape(it.label) + "</span> <span class='text-slate-600'>" + htmlEscape(it.value) + "</span>";
+      tagsBox.appendChild(tag);
+    });
+  }
+
+  function load() {
+    if (!list) return;
+    list.innerHTML = "";
+    if (empty) empty.classList.add("hidden");
+    window.API.auth.listRepairs().then(function (repairs) {
+      showLoggedIn(true);
+      if (vehicleFilter) {
+        repairs = (repairs || []).filter(function (r) { return r.vehicle_id === vehicleFilter; });
+      }
+      if (!repairs || !repairs.length) {
+        if (empty) empty.classList.remove("hidden");
+        return;
+      }
+      repairs.forEach(function (r) { list.appendChild(buildRepairCard(r, t)); });
+    }).catch(function (err) {
+      if (err.status === 401) { showLoggedIn(false); return; }
+      showMessage(err.message || t("error_generic"));
+    });
+  }
+  if (vehicleFilter) {
+    window.API.auth.listVehicles().then(renderVehicleTags).catch(function () {});
+  }
+  load();
+  window.refreshRepairs = load;
+  document.addEventListener("client:login", load);
+}
+
 document.addEventListener("i18n:ready", () => {
   if (window.__initDone) return;
   window.__initDone = true;
   if (window.PAGE === "schedule") initSchedule();
   if (window.PAGE === "status") initStatus();
   if (window.PAGE === "vehicles") initVehicles();
+  if (window.PAGE === "garage") initGarage();
+  if (window.PAGE === "appointments") initAppointments();
+  if (window.PAGE === "repairs") initRepairs();
   if (window.ClientAuth) {
     if (window.PAGE === "schedule") window.ClientAuth.prefillForm();
     if (window.PAGE === "schedule") {
@@ -888,6 +1260,10 @@ document.addEventListener("i18n:ready", () => {
   es.addEventListener("appointment", function () {
     loadAnnouncement();
     if (window.refreshScheduleCalendar) window.refreshScheduleCalendar();
+    if (window.refreshAppointments) window.refreshAppointments();
+  });
+  es.addEventListener("vehicle", function () {
+    if (window.refreshRepairs) window.refreshRepairs();
   });
   es.addEventListener("settings", function () {
     if (window.refreshScheduleCalendar) window.refreshScheduleCalendar();

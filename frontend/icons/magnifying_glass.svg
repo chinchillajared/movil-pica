@@ -1,0 +1,6 @@
+<!-- 11. magnifying glass -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <circle cx="27" cy="27" r="15" fill="#bae6fd" stroke="#334155" stroke-width="4"/>
+  <line x1="38" y1="38" x2="53" y2="53" stroke="#334155" stroke-width="7" stroke-linecap="round"/>
+  <path d="M18 25a10 10 0 0 1 7-7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+</svg>

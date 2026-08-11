@@ -10,6 +10,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     JSON,
+    Numeric,
     ForeignKey,
     UniqueConstraint,
 )
@@ -236,11 +237,11 @@ class Vehicle(Base):
         onupdate=func.now(),
     )
 
-    visits = relationship(
-        "VehicleVisit",
+    service_records = relationship(
+        "ServiceRecord",
         back_populates="vehicle",
         cascade="all, delete-orphan",
-        order_by="VehicleVisit.visit_date.desc(), VehicleVisit.id.desc()",
+        order_by="ServiceRecord.created_at.desc(), ServiceRecord.id.desc()",
     )
 
     client_owners = relationship(
@@ -251,33 +252,31 @@ class Vehicle(Base):
     )
 
 
-class VehicleVisit(Base):
-    """A diagnostic / work record on a vehicle."""
+class ServiceRecord(Base):
+    """Historial de servicios: an entry in a vehicle's service history.
 
-    __tablename__ = "vehicle_visits"
+    Each record stores the symptom/reparation title ("Síntoma o reparación"),
+    the diagnosis or notes ("Diagnóstico o notas"), the odometer reading with
+    its photo, and a list of price rows (mano de obra / repuestos).
+    """
+
+    __tablename__ = "service_records"
 
     id = Column(Integer, primary_key=True, index=True)
     vehicle_id = Column(
         Integer, ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    visit_date = Column(Date, nullable=False)
-    # title: short title of the record (e.g. "Problema de arranque")
+    # title: "Síntoma o reparación"
     title = Column(Text, nullable=False, server_default="")
+    # diagnosis: "Diagnóstico o notas"
+    diagnosis = Column(Text, nullable=False, server_default="")
+    # mileage: numeric odometer reading; mileage_unit: "km" or "mi"
+    mileage = Column(Integer, nullable=True)
+    mileage_unit = Column(String(5), nullable=False, server_default="km")
     # mileage_photo: "<data-url base64>" of the odometer
     mileage_photo = Column(Text, nullable=False, server_default="")
-    # fuel_level_photo: "<data-url base64>" of the fuel gauge
-    fuel_level_photo = Column(Text, nullable=False, server_default="")
-    # condition_photos: {"front": url, "left": url, "right": url, "rear": url}
-    condition_photos = Column(JSON, nullable=False, default=dict)
-    # defect_photos: list of "<data-url base64>" strings
-    defect_photos = Column(JSON, nullable=False, default=list)
-    observations = Column(Text, nullable=False, server_default="")
-    # belongings: text of personal items left in the vehicle
-    belongings = Column(Text, nullable=False, server_default="")
-    # belongings_photos: list of "<data-url base64>" strings
-    belongings_photos = Column(JSON, nullable=False, default=list)
-    # jobs: [{"diagnostic": str, "observations": str, "photos": [url, ...]}]
-    jobs = Column(JSON, nullable=False, default=list)
+    # other_photos: list of extra "<data-url base64>" photos
+    other_photos = Column(JSON, nullable=False, server_default="[]")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True),
@@ -285,4 +284,33 @@ class VehicleVisit(Base):
         onupdate=func.now(),
     )
 
-    vehicle = relationship("Vehicle", back_populates="visits")
+    vehicle = relationship("Vehicle", back_populates="service_records")
+    price_rows = relationship(
+        "ServicePriceRow",
+        back_populates="record",
+        cascade="all, delete-orphan",
+        order_by="ServicePriceRow.id.asc()",
+    )
+
+
+class ServicePriceRow(Base):
+    """A price row within a ServiceRecord: labor (mano de obra) or parts (repuestos)."""
+
+    __tablename__ = "service_price_rows"
+
+    id = Column(Integer, primary_key=True, index=True)
+    record_id = Column(
+        Integer,
+        ForeignKey("service_records.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # kind: "labor" (mano de obra) or "parts" (repuestos)
+    kind = Column(String(10), nullable=False, server_default="labor")
+    # currency: "CRC" (colones) or "USD" (dólares)
+    currency = Column(String(5), nullable=False, server_default="CRC")
+    description = Column(Text, nullable=False, server_default="")
+    amount = Column(Numeric(12, 2), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    record = relationship("ServiceRecord", back_populates="price_rows")

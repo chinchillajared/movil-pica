@@ -7,7 +7,7 @@
 (function () {
   var t = function (k) { return (window.I18N && window.I18N.t) ? window.I18N.t(k) : k; };
 
-  var GEAR_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+  var GEAR_SVG = '<img src="/icons/gear.svg" alt="" class="w-5 h-5 block" />';
 
   function currentClient() { return getClientUser(); }
 
@@ -41,17 +41,6 @@
     langBlock.appendChild(langLabel);
     langBlock.appendChild(langSwitcher);
     menu.appendChild(langBlock);
-
-    var account = document.createElement("button");
-    account.type = "button";
-    account.className = "w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50";
-    account.textContent = t("client_my_account");
-    account.addEventListener("click", function () {
-      closeMenu();
-      if (loggedIn) openAccountModal();
-      else openModal("login");
-    });
-    menu.appendChild(account);
 
     if (loggedIn) {
       var logout = document.createElement("button");
@@ -103,6 +92,8 @@
     document.getElementById("account-modal-title").textContent = t("client_my_account");
 
     var body = overlay.querySelector("#account-modal-body");
+    var tags = document.createElement("div");
+    tags.className = "flex flex-wrap justify-center gap-2";
     var rows = [
       { k: "label_first_name", v: c.first_name },
       { k: "label_last_name", v: c.last_name },
@@ -110,11 +101,12 @@
       { k: "label_phone", v: (c.country_code || "+506") + " " + c.phone },
     ];
     rows.forEach(function (r) {
-      var p = document.createElement("p");
-      p.className = "mb-2 text-sm";
-      p.innerHTML = '<span class="text-slate-400">' + t(r.k) + ':</span> <span class="font-medium">' + escapeHtml(r.v) + '</span>';
-      body.appendChild(p);
+      var tag = document.createElement("span");
+      tag.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 bg-white text-sm";
+      tag.innerHTML = '<span class="font-bold text-slate-800">' + escapeHtml(t(r.k)) + '</span> <span class="text-slate-600">' + escapeHtml(r.v) + '</span>';
+      tags.appendChild(tag);
     });
+    body.appendChild(tags);
 
     overlay.querySelector("#account-modal-close").addEventListener("click", function () { overlay.remove(); });
     overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
@@ -231,8 +223,10 @@
         window.API.auth.register(payload).then(handleAuth).catch(function (e) { showErr(err, e.message || t("error_generic")); });
       } else {
         window.API.auth.login({ email: email, password: pass }).then(handleAuth).catch(function (e) {
-          if (e.status === 401) showErr(err, t("client_invalid_credentials"));
-          else showErr(err, e.message || t("error_generic"));
+          if (e.status === 401) {
+            var detail = e.data && e.data.detail;
+            showErr(err, detail === "client_not_registered" ? t("client_not_registered") : t("client_invalid_credentials"));
+          } else showErr(err, e.message || t("error_generic"));
         });
       }
     }
@@ -264,12 +258,7 @@
   }
 
   function tryRefresh() {
-    var tokens = getClientTokens();
-    if (!tokens.refresh) return Promise.resolve(false);
-    return window.API.auth.refresh(tokens.refresh).then(function (res) {
-      setClientTokens({ access_token: res.access_token });
-      return true;
-    }).catch(function () { return false; });
+    return window.API.refreshClientToken();
   }
 
   function escapeHtml(s) {

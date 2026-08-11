@@ -146,6 +146,15 @@ def list_users(admin: User = Depends(require_admin), db: Session = Depends(get_d
     return [schemas.UserOut.model_validate(u) for u in crud.list_users(db)]
 
 
+@router.get(
+    "/technicians",
+    response_model=list[schemas.TechnicianOut],
+    dependencies=[Depends(require_mechanic)],
+)
+def list_technicians(db: Session = Depends(get_db)):
+    return [schemas.TechnicianOut.model_validate(u) for u in crud.list_technicians(db)]
+
+
 @router.post(
     "/users",
     response_model=schemas.UserOut,
@@ -318,6 +327,41 @@ def list_clients(user: User = Depends(require_mechanic), db: Session = Depends(g
     return [schemas.ClientOut.model_validate(c) for c in crud.list_clients(db)]
 
 
+@router.get(
+    "/clients/{client_id}/vehicles",
+    response_model=list[schemas.VehicleSummaryOut],
+    dependencies=[Depends(rate_limit(max_requests=60, window_seconds=60))],
+)
+def list_client_vehicles(
+    client_id: int, user: User = Depends(require_mechanic), db: Session = Depends(get_db)
+):
+    vehicles = crud.list_vehicles_by_client(db, client_id)
+    counts = crud.count_vehicle_service_records(db, [v.id for v in vehicles])
+    owners = crud.list_vehicle_owners(db, [v.id for v in vehicles])
+    out = []
+    for v in vehicles:
+        s = schemas.VehicleSummaryOut.model_validate(v)
+        s.services_count = counts.get(v.id, 0)
+        s.owners = [schemas.ClientBrief.model_validate(c) for c in owners.get(v.id, [])]
+        out.append(s)
+    return out
+
+
+@router.delete(
+    "/clients/{client_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(rate_limit(max_requests=30, window_seconds=60))],
+)
+def delete_client(
+    client_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+):
+    try:
+        crud.delete_client(db, client_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return None
+
+
 @router.post(
     "/emails/send",
     dependencies=[Depends(rate_limit(max_requests=30, window_seconds=60))],
@@ -350,7 +394,15 @@ def list_appointments(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"status must be one of {sorted(schemas.VALID_STATUSES)}",
         )
-    return crud.list_appointments(db, status=status_filter, date_from=date_from)
+    appts = crud.list_appointments(db, status=status_filter, date_from=date_from)
+    plate_keys = [schemas.normalize_plate_key(a.plate) for a in appts]
+    by_key = crud.map_vehicle_ids_by_plate(db, plate_keys)
+    out = []
+    for a in appts:
+        s = schemas.AppointmentOut.model_validate(a)
+        s.vehicle_id = by_key.get(schemas.normalize_plate_key(a.plate))
+        out.append(s)
+    return out
 
 
 @router.post(
@@ -577,12 +629,12 @@ def list_vehicles(
     db: Session = Depends(get_db),
 ):
     objs = crud.list_vehicles(db, q)
-    counts = crud.count_vehicle_visits(db, [o.id for o in objs])
+    counts = crud.count_vehicle_service_records(db, [o.id for o in objs])
     owners = crud.list_vehicle_owners(db, [o.id for o in objs])
     out = []
     for o in objs:
         s = schemas.VehicleSummaryOut.model_validate(o)
-        s.visits_count = counts.get(o.id, 0)
+        s.services_count = counts.get(o.id, 0)
         s.owners = [schemas.ClientBrief.model_validate(c) for c in owners.get(o.id, [])]
         out.append(s)
     return out
@@ -609,6 +661,10 @@ def get_vehicle(vehicle_id: int, db: Session = Depends(get_db)):
     owners = crud.list_vehicle_owners(db, [obj.id]).get(obj.id, [])
     out = schemas.VehicleOut.model_validate(obj)
     out.owners = [schemas.ClientBrief.model_validate(c) for c in owners]
+    out.service_history = [
+        _service_record_out(r)
+        for r in crud.list_service_records_for_vehicles(db, [obj.id])
+    ]
     return out
 
 
@@ -636,43 +692,69 @@ def delete_vehicle(vehicle_id: int, db: Session = Depends(get_db)):
     return None
 
 
-@router.post("/vehicles/{vehicle_id}/visits", response_model=schemas.VehicleVisitOut,
+@router.get("/vehicles/{vehicle_id}/history", response_model=list[schemas.ServiceRecordOut],
+            dependencies=[Depends(require_mechanic)])
+def list_vehicle_history(vehicle_id: int, db: Session = Depends(get_db)):
+    if crud.get_vehicle(db, vehicle_id) is None:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    return [
+        _service_record_out(r)
+        for r in crud.list_service_records_for_vehicles(db, [vehicle_id])
+    ]
+
+
+@router.post("/vehicles/{vehicle_id}/history", response_model=schemas.ServiceRecordOut,
              status_code=status.HTTP_201_CREATED,
              dependencies=[Depends(require_mechanic)])
-def create_vehicle_visit(
-    vehicle_id: int, payload: schemas.VehicleVisitCreate, db: Session = Depends(get_db)
+def create_service_record(
+    vehicle_id: int, payload: schemas.ServiceRecordCreate, db: Session = Depends(get_db)
 ):
     try:
-        obj = crud.create_visit(db, vehicle_id, payload)
-    except crud.DuplicateVisitTitleError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        obj = crud.create_service_record(db, vehicle_id, payload)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404 if "vehicle" in str(e) else 400, detail=str(e))
     event_manager.publish("vehicle", {"type": "updated"})
-    return obj
+    return _service_record_out(obj)
 
 
-@router.put("/visits/{visit_id}", response_model=schemas.VehicleVisitOut,
+@router.get("/history/{record_id}", response_model=schemas.ServiceRecordOut,
             dependencies=[Depends(require_mechanic)])
-def update_vehicle_visit(
-    visit_id: int, payload: schemas.VehicleVisitUpdate, db: Session = Depends(get_db)
+def get_service_record(record_id: int, db: Session = Depends(get_db)):
+    obj = crud.get_service_record(db, record_id)
+    if obj is None:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return _service_record_out(obj)
+
+
+@router.put("/history/{record_id}", response_model=schemas.ServiceRecordOut,
+            dependencies=[Depends(require_mechanic)])
+def update_service_record(
+    record_id: int, payload: schemas.ServiceRecordUpdate, db: Session = Depends(get_db)
 ):
     try:
-        obj = crud.update_visit(db, visit_id, payload)
-    except crud.DuplicateVisitTitleError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        obj = crud.update_service_record(db, record_id, payload)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     event_manager.publish("vehicle", {"type": "updated"})
-    return obj
+    return _service_record_out(obj)
 
 
-@router.delete("/visits/{visit_id}", status_code=status.HTTP_204_NO_CONTENT,
+@router.delete("/history/{record_id}", status_code=status.HTTP_204_NO_CONTENT,
                dependencies=[Depends(require_mechanic)])
-def delete_vehicle_visit(visit_id: int, db: Session = Depends(get_db)):
+def delete_service_record(record_id: int, db: Session = Depends(get_db)):
     try:
-        crud.delete_visit(db, visit_id)
+        crud.delete_service_record(db, record_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     event_manager.publish("vehicle", {"type": "updated"})
     return None
+
+
+def _service_record_out(record) -> schemas.ServiceRecordOut:
+    out = schemas.ServiceRecordOut.model_validate(record)
+    total = 0.0
+    for row in record.price_rows:
+        if row.amount is not None:
+            total += float(row.amount)
+    out.total = round(total, 2)
+    return out

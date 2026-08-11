@@ -124,6 +124,8 @@ class AppointmentOut(BaseModel):
     address: str
     reserved_dates: list[str] = Field(default_factory=list)
     status: str
+    # id of the registered vehicle matching the appointment plate, if any.
+    vehicle_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
@@ -349,6 +351,21 @@ class ClientAuthResponse(BaseModel):
     client: ClientOut
 
 
+class ClientAppointmentOut(BaseModel):
+    appointment_number: str
+    first_name: str
+    last_name: str
+    phone: str
+    plate: str
+    appointment_date: date
+    appointment_time: time
+    address: str
+    status: str
+
+    class Config:
+        from_attributes = True
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(..., min_length=10)
 
@@ -403,6 +420,14 @@ class UserOut(BaseModel):
     role: str
     is_active: bool
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TechnicianOut(BaseModel):
+    id: int
+    name: str
 
     class Config:
         from_attributes = True
@@ -544,62 +569,6 @@ class VehicleUpdate(BaseModel):
         return _normalize_plate(v)
 
 
-class JobItem(BaseModel):
-    diagnostic: str = Field(default="", max_length=5000)
-    observations: str = Field(default="", max_length=5000)
-    photos: list[str] = Field(default_factory=list, max_length=20)
-
-
-class VehicleVisitBase(BaseModel):
-    title: str = Field(..., min_length=1, max_length=200)
-    visit_date: Optional[date] = None
-    mileage_photo: str = Field(default="", max_length=20000000)
-    fuel_level_photo: str = Field(default="", max_length=20000000)
-    condition_photos: dict[str, str] = Field(default_factory=dict)
-    defect_photos: list[str] = Field(default_factory=list, max_length=20)
-    observations: str = Field(default="", max_length=5000)
-    belongings: str = Field(default="", max_length=5000)
-    belongings_photos: list[str] = Field(default_factory=list, max_length=20)
-    jobs: list[JobItem] = Field(default_factory=list, max_length=50)
-
-
-class VehicleVisitCreate(VehicleVisitBase):
-    pass
-
-
-class VehicleVisitUpdate(BaseModel):
-    title: Optional[str] = None
-    visit_date: Optional[date] = None
-    mileage_photo: Optional[str] = None
-    fuel_level_photo: Optional[str] = None
-    condition_photos: Optional[dict[str, str]] = None
-    defect_photos: Optional[list[str]] = None
-    observations: Optional[str] = None
-    belongings: Optional[str] = None
-    belongings_photos: Optional[list[str]] = None
-    jobs: Optional[list[JobItem]] = None
-
-
-class VehicleVisitOut(BaseModel):
-    id: int
-    vehicle_id: int
-    title: str
-    visit_date: date
-    mileage_photo: str
-    fuel_level_photo: str
-    condition_photos: dict[str, str]
-    defect_photos: list[str]
-    observations: str
-    belongings: str
-    belongings_photos: list[str]
-    jobs: list[JobItem]
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 class ClientBrief(BaseModel):
     id: int
     first_name: str
@@ -619,7 +588,7 @@ class VehicleSummaryOut(BaseModel):
     color: str
     front_photo: str = ""
     owners: list[ClientBrief] = Field(default_factory=list)
-    visits_count: int = 0
+    services_count: int = 0
     created_at: datetime
 
     class Config:
@@ -635,7 +604,103 @@ class VehicleOut(BaseModel):
     color: str
     owners: list[ClientBrief] = Field(default_factory=list)
     front_photo: str
-    visits: list[VehicleVisitOut] = Field(default_factory=list)
+    service_history: list["ServiceRecordOut"] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --------------------------------------------------------------------------
+# Service history (Historial de Servicios)
+# --------------------------------------------------------------------------
+class ServicePriceRowBase(BaseModel):
+    kind: str = Field(default="labor", max_length=10)
+    currency: str = Field(default="CRC", max_length=5)
+    description: str = Field(default="", max_length=500)
+    amount: Optional[float] = Field(default=None, ge=0)
+
+    @field_validator("kind")
+    @classmethod
+    def check_kind(cls, v: str) -> str:
+        v = (v or "").strip().lower()
+        if v not in {"labor", "parts"}:
+            raise ValueError("kind must be 'labor' or 'parts'")
+        return v
+
+    @field_validator("currency")
+    @classmethod
+    def check_currency(cls, v: str) -> str:
+        v = (v or "").strip().upper()
+        if v not in {"CRC", "USD"}:
+            raise ValueError("currency must be 'CRC' or 'USD'")
+        return v
+
+
+def _clean_mileage_unit(v: str) -> str:
+    v = (v or "").strip().lower()
+    if v not in {"km", "mi"}:
+        raise ValueError("mileage_unit must be 'km' or 'mi'")
+    return v
+
+
+class ServiceRecordCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    diagnosis: str = Field(default="", max_length=5000)
+    mileage: Optional[int] = Field(default=None, ge=0)
+    mileage_unit: str = Field(default="km", max_length=5)
+    mileage_photo: str = Field(default="", max_length=20000000)
+    other_photos: list[str] = Field(default_factory=list)
+    price_rows: list[ServicePriceRowBase] = Field(default_factory=list)
+
+    @field_validator("mileage_unit")
+    @classmethod
+    def check_mileage_unit(cls, v: str) -> str:
+        return _clean_mileage_unit(v)
+
+
+class ServiceRecordUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=200)
+    diagnosis: Optional[str] = Field(default=None, max_length=5000)
+    mileage: Optional[int] = Field(default=None, ge=0)
+    mileage_unit: Optional[str] = None
+    mileage_photo: Optional[str] = None
+    other_photos: Optional[list[str]] = None
+    price_rows: Optional[list[ServicePriceRowBase]] = None
+
+    @field_validator("mileage_unit")
+    @classmethod
+    def check_mileage_unit(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return _clean_mileage_unit(v)
+
+
+class ServicePriceRowOut(BaseModel):
+    id: int
+    record_id: int
+    kind: str
+    currency: str = "CRC"
+    description: str
+    amount: Optional[float] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ServiceRecordOut(BaseModel):
+    id: int
+    vehicle_id: int
+    title: str
+    diagnosis: str
+    mileage: Optional[int] = None
+    mileage_unit: str = "km"
+    mileage_photo: str = ""
+    other_photos: list[str] = Field(default_factory=list)
+    price_rows: list[ServicePriceRowOut] = Field(default_factory=list)
+    total: float = 0
     created_at: datetime
     updated_at: datetime
 

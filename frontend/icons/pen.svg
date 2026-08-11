@@ -1,0 +1,10 @@
+<!-- 10. pen -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <g transform="rotate(45 32 32)" stroke="#334155" stroke-width="1.5" stroke-linejoin="round">
+    <rect x="26" y="9" width="12" height="6" rx="2" fill="#f472b6"/>
+    <rect x="26" y="15" width="12" height="4" fill="#94a3b8"/>
+    <rect x="26" y="19" width="12" height="25" fill="#fbbf24"/>
+    <path d="M26 44h12l-6 11z" fill="#fde68a"/>
+    <path d="M30.4 51.3h3.2L32 55z" fill="#334155"/>
+  </g>
+</svg>

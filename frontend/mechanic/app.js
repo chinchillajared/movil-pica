@@ -8,6 +8,22 @@ function escapeHTML(s) {
   });
 }
 
+function buildInfoTag(label, value) {
+  var tag = document.createElement("span");
+  tag.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 bg-white text-sm";
+  tag.innerHTML = "<span class='font-bold text-slate-800'>" + escapeHTML(label) + "</span> <span class='text-slate-600'>" + escapeHTML(value == null || value === "" ? "—" : value) + "</span>";
+  return tag;
+}
+
+function tagsRow(items) {
+  var wrap = document.createElement("div");
+  wrap.className = "flex flex-wrap justify-center gap-2";
+  items.forEach(function (it) {
+    wrap.appendChild(buildInfoTag(it.label, it.value));
+  });
+  return wrap;
+}
+
 function t(key) {
   return window.I18N ? window.I18N.t(key) : key;
 }
@@ -336,6 +352,124 @@ function formatLongDate(dateStr) {
   return window.formatAppDate ? window.formatAppDate(dateStr) : dateStr;
 }
 
+function formatDMY(dateStr) {
+  if (!dateStr) return "";
+  var p = String(dateStr).split("-");
+  return p[2] + "/" + p[1] + "/" + p[0];
+}
+
+function attachDatePicker(trigger, wrap, initialDate, onChange) {
+  var year = initialDate ? parseInt(initialDate.slice(0, 4), 10) : new Date().getFullYear();
+  var month = initialDate ? parseInt(initialDate.slice(5, 7), 10) - 1 : new Date().getMonth();
+  var selected = initialDate || todayISO();
+  var monthNames = monthNamesES();
+
+  function buildCalendar(overlay, close) {
+    var box = document.createElement("div");
+    box.className = "bg-white rounded-2xl shadow-2xl w-full max-w-xs p-4 select-none";
+    var top = document.createElement("div");
+    top.className = "flex items-center justify-between mb-1";
+    var topTitle = document.createElement("span");
+    topTitle.className = "text-sm font-bold text-slate-800";
+    topTitle.textContent = t("visits_date");
+    var closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "text-slate-500 hover:text-slate-800 text-sm font-medium";
+    closeBtn.textContent = t("dialog_close");
+    closeBtn.addEventListener("click", function () { if (close) close(); });
+    top.appendChild(topTitle);
+    top.appendChild(closeBtn);
+    box.appendChild(top);
+
+    var header = document.createElement("div");
+    header.className = "flex items-center justify-between mb-2";
+    var prev = document.createElement("button");
+    prev.type = "button";
+    prev.className = "w-8 h-8 rounded-full hover:bg-slate-100 text-slate-600 text-lg leading-none";
+    prev.textContent = "‹";
+    var label = document.createElement("span");
+    label.className = "font-bold text-sm";
+    label.textContent = monthNames[month] + " " + year;
+    var next = document.createElement("button");
+    next.type = "button";
+    next.className = "w-8 h-8 rounded-full hover:bg-slate-100 text-slate-600 text-lg leading-none";
+    next.textContent = "›";
+    header.appendChild(prev);
+    header.appendChild(label);
+    header.appendChild(next);
+    box.appendChild(header);
+
+    var hrow = document.createElement("div");
+    hrow.className = "grid grid-cols-7 text-center text-xs font-semibold text-slate-500 mb-1";
+    for (var d = 0; d < 7; d++) {
+      var hc = document.createElement("div");
+      hc.textContent = dayLabel(d);
+      hrow.appendChild(hc);
+    }
+    box.appendChild(hrow);
+
+    var grid = document.createElement("div");
+    grid.className = "grid grid-cols-7 gap-1 text-center";
+    var firstDay = new Date(year, month, 1).getDay();
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (var i = 0; i < firstDay; i++) grid.appendChild(document.createElement("div"));
+    for (var day = 1; day <= daysInMonth; day++) {
+      var dateStr = year + "-" + String(month + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+      var cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "w-8 h-8 rounded-lg text-sm font-medium " + (dateStr === selected ? "bg-brand-600 text-white" : "hover:bg-slate-100 text-slate-700");
+      cell.textContent = day;
+      cell.addEventListener("click", (function (ds) {
+        return function () {
+          selected = ds;
+          if (onChange) onChange(ds);
+          overlay.remove();
+        };
+      })(dateStr));
+      grid.appendChild(cell);
+    }
+    box.appendChild(grid);
+
+    prev.addEventListener("click", function () {
+      month--;
+      if (month < 0) { month = 11; year--; }
+      box.innerHTML = "";
+      buildCalendar(overlay, close);
+    });
+    next.addEventListener("click", function () {
+      month++;
+      if (month > 11) { month = 0; year++; }
+      box.innerHTML = "";
+      buildCalendar(overlay, close);
+    });
+
+    overlay.appendChild(box);
+  }
+
+  trigger.addEventListener("click", function (e) {
+    e.stopPropagation();
+    var overlay = document.createElement("div");
+    overlay.id = "app-date-overlay";
+    overlay.className = "fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4";
+    function close() { overlay.remove(); }
+    overlay.addEventListener("click", function (ev) { if (ev.target === overlay) close(); });
+    buildCalendar(overlay, close);
+    document.body.appendChild(overlay);
+  });
+
+  return {
+    getValue: function () { return selected; },
+    setValue: function (ds) {
+      selected = ds;
+      if (ds) {
+        year = parseInt(ds.slice(0, 4), 10);
+        month = parseInt(ds.slice(5, 7), 10) - 1;
+      }
+      if (onChange) onChange(ds);
+    },
+  };
+}
+
 function statusLabel(s) {
   var map = {
     pending: "status_pending",
@@ -369,11 +503,18 @@ function photoThumb(src, onClick) {
 
 function viewPhoto(src) {
   if (!src) return;
-  var m = openModal("Foto", "");
-  var img = document.createElement("img");
-  img.src = src;
-  img.className = "max-w-full rounded-lg";
-  m.body.appendChild(img);
+  var overlay = document.createElement("div");
+  overlay.id = "app-photo-overlay";
+  overlay.className = "fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4";
+  overlay.innerHTML =
+    '<div class="bg-white rounded-2xl p-2 max-w-full max-h-full overflow-auto">' +
+      '<img class="max-w-full max-h-[85vh] rounded-lg" src="' + escapeHTML(src) + '" />' +
+      '<button type="button" id="photo-close" class="block mx-auto mt-2 px-4 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-medium">' + escapeHTML(t("dialog_close")) + '</button>' +
+    '</div>';
+  function close() { overlay.remove(); }
+  overlay.querySelector("#photo-close").addEventListener("click", close);
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+  document.body.appendChild(overlay);
 }
 
 var STATUS_SQUARE = {
@@ -620,10 +761,11 @@ function initCreatePage() {
       var btn = document.createElement("button");
       btn.type = "button";
       var selected = h === selectedTime;
+      var tv = to12(h);
       btn.className = selected
         ? "py-4 rounded-xl border-2 border-brand-600 bg-brand-50 text-brand-700 font-semibold text-lg"
         : "py-4 rounded-xl border-2 border-slate-300 font-semibold text-lg bg-white hover:bg-slate-50 transition text-slate-800";
-      btn.textContent = h;
+      btn.textContent = tv.hour + ":" + tv.minute + " " + tv.ampm;
       btn.addEventListener("click", function () {
         selectedTime = h;
         renderTimeSlots();
@@ -657,7 +799,10 @@ function initCreatePage() {
       if (finalDate && selectedDate) {
         finalDate.textContent = formatLongDate(selectedDate);
       }
-      if (finalTime && selectedTime) finalTime.textContent = selectedTime;
+      if (finalTime && selectedTime) {
+        var tv2 = to12(selectedTime);
+        finalTime.textContent = tv2.hour + ":" + tv2.minute + " " + tv2.ampm;
+      }
     }
   }
 
@@ -767,8 +912,12 @@ function initCreatePage() {
         hideLoading();
         if (submitBtn) submitBtn.disabled = false;
         var num = (data && (data.appointment_number || (data.appointment && data.appointment.number))) || "#";
-        $("create-appt-number").textContent = num;
-        $("create-appt-plate").textContent = plate;
+        var st = $("create-success-tags");
+        if (st) {
+          st.innerHTML = "";
+          st.appendChild(buildInfoTag(t("your_number"), num));
+          st.appendChild(buildInfoTag(t("label_plate"), plate));
+        }
         var s3 = $("step-3");
         if (s3) s3.classList.add("hidden");
         var success = $("create-success");
@@ -778,6 +927,115 @@ function initCreatePage() {
         if (submitBtn) submitBtn.disabled = false;
         showErrorBox("form-error", err.message || "Error al agendar cita.");
       });
+    });
+  }
+
+  var customerGuestBtn = $("customer-guest");
+  var customerRegBtn = $("customer-registered");
+  var regWrap = $("registered-client-wrap");
+  var regVehicleSelect = $("registered-vehicle-select");
+
+  function setCustomerType(type) {
+    var isRegistered = type === "registered";
+    if (regWrap) regWrap.classList.toggle("hidden", !isRegistered);
+    if (customerGuestBtn) {
+      customerGuestBtn.className = "px-5 py-2 text-sm font-semibold rounded-md " + (isRegistered ? "text-slate-600 hover:text-slate-800" : "bg-white text-brand-700 shadow-sm");
+    }
+    if (customerRegBtn) {
+      customerRegBtn.className = "px-5 py-2 text-sm font-semibold rounded-md " + (isRegistered ? "bg-white text-brand-700 shadow-sm" : "text-slate-600 hover:text-slate-800");
+    }
+  }
+
+  if (customerGuestBtn) customerGuestBtn.addEventListener("click", function () { setCustomerType("guest"); });
+  if (customerRegBtn) customerRegBtn.addEventListener("click", function () { setCustomerType("registered"); });
+
+  var allClients = [];
+  var clientSearch = $("client-search");
+  var clientSearchResults = $("client-search-results");
+  var clientSearchEmpty = $("client-search-empty");
+
+  function renderClientResults(filter) {
+    if (!clientSearchResults) return;
+    clientSearchResults.innerHTML = "";
+    if (clientSearchEmpty) clientSearchEmpty.classList.add("hidden");
+    var q = (filter || "").toLowerCase().trim();
+    if (!q) return;
+    var matches = allClients.filter(function (c) {
+      var first = (c.first_name || "").toLowerCase();
+      var last = (c.last_name || "").toLowerCase();
+      var phone = String(c.phone || "").toLowerCase();
+      return first.indexOf(q) !== -1 || last.indexOf(q) !== -1 || (first + " " + last).indexOf(q) !== -1 || phone.indexOf(q) !== -1;
+    });
+    if (matches.length === 0) {
+      if (clientSearchEmpty) {
+        clientSearchEmpty.textContent = t("appointment_no_clients_found");
+        clientSearchEmpty.classList.remove("hidden");
+      }
+      return;
+    }
+    matches.forEach(function (c) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "w-full text-left px-4 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50";
+      var name = document.createElement("span");
+      name.className = "block font-medium text-slate-800";
+      name.textContent = c.first_name + " " + c.last_name;
+      btn.appendChild(name);
+      btn.appendChild(tagsRow([{ label: t("label_phone"), value: (c.country_code || "") + " " + c.phone }]));
+      btn.addEventListener("click", function () {
+        if (clientSearch) clientSearch.value = c.first_name + " " + c.last_name;
+        if (clientSearchResults) clientSearchResults.innerHTML = "";
+        if (clientSearchEmpty) clientSearchEmpty.classList.add("hidden");
+        fillRegisteredClient(c);
+      });
+      clientSearchResults.appendChild(btn);
+    });
+  }
+
+  if (clientSearch) {
+    clientSearch.addEventListener("input", function () {
+      renderClientResults(clientSearch.value);
+    });
+  }
+
+  window.API.mechanic.listClients().then(function (clients) {
+    allClients = clients || [];
+  }).catch(function () {});
+
+  function fillRegisteredClient(client) {
+    var first = $("first_name");
+    var last = $("last_name");
+    var phoneInput = $("phone");
+    var email = $("email");
+    if (first) first.value = client.first_name || "";
+    if (last) last.value = client.last_name || "";
+    if (phoneInput) phoneInput.value = client.phone || "";
+    if (email) email.value = client.email || "";
+    phoneCode = client.country_code || "+506";
+    var pcBtn = $("phone-code-btn");
+    if (pcBtn) {
+      pcBtn.setAttribute("data-value", phoneCode);
+      var known = { "+506": "\uD83C\uDDE8\uD83C\uDDF7", "+1": "\uD83C\uDDFA\uD83C\uDDF8" };
+      pcBtn.childNodes[0].textContent = (known[phoneCode] || "") + " " + phoneCode;
+    }
+    if (regVehicleSelect) {
+      regVehicleSelect.disabled = false;
+      regVehicleSelect.innerHTML = '<option value="">' + t("appointment_vehicle_other") + '</option>';
+      window.API.mechanic.listClientVehicles(client.id).then(function (vehicles) {
+        (vehicles || []).forEach(function (v) {
+          var opt = document.createElement("option");
+          opt.value = v.plate;
+          opt.textContent = v.plate + (v.make || v.model ? " — " + [v.make, v.model].filter(Boolean).join(" ") : "");
+          regVehicleSelect.appendChild(opt);
+        });
+      }).catch(function () {});
+    }
+  }
+
+  if (regVehicleSelect) {
+    regVehicleSelect.addEventListener("change", function () {
+      var plateInput = $("plate");
+      if (plateInput) plateInput.value = regVehicleSelect.value;
     });
   }
 
@@ -842,14 +1100,6 @@ function initGearMenu() {
     });
   }
 
-  var accountBtn = $("account-menu-account");
-  if (accountBtn) {
-    accountBtn.addEventListener("click", function () {
-      dropdown.classList.add("hidden");
-      openAccountModal();
-    });
-  }
-
   var backHome = $("back-home-btn");
   if (backHome) {
     backHome.addEventListener("click", function () {
@@ -867,11 +1117,12 @@ function openAccountModal() {
   var m = openModal(t("client_my_account"), "");
   var u = currentUser || getMechanicUser() || {};
   var info = document.createElement("div");
-  info.className = "space-y-1 text-sm mb-5";
-  info.innerHTML =
-    "<p><span class='text-slate-500'>Nombre:</span> " + escapeHTML(u.name || "") + "</p>" +
-    "<p><span class='text-slate-500'>Email:</span> " + escapeHTML(u.email || "") + "</p>" +
-    "<p><span class='text-slate-500'>Rol:</span> " + escapeHTML(u.role || "") + "</p>";
+  info.className = "mb-5";
+  info.appendChild(tagsRow([
+    { label: t("field_name"), value: u.name || "" },
+    { label: t("client_email"), value: u.email || "" },
+    { label: t("users_role"), value: u.role || "" },
+  ]));
   m.body.appendChild(info);
 
   var form = document.createElement("form");
@@ -1067,21 +1318,38 @@ function buildApptRow(a, apptTime) {
   row.className = "py-3 border-b border-slate-100";
 
   var info = document.createElement("div");
-  info.className = "flex flex-wrap items-start justify-between gap-2 text-sm mb-3";
+  info.className = "flex flex-wrap items-center justify-between gap-2 mb-3";
   var tv = to12(a.appointment_time);
-  info.innerHTML =
-    "<div class='space-y-1'>" +
-      "<div><span class='text-slate-500'>" + t("cal_name") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(a.first_name + " " + a.last_name) + "</span></div>" +
-      "<div><span class='text-slate-500'>" + t("cal_time") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(tv.hour + ":" + tv.minute + " " + tv.ampm) + "</span></div>" +
-      "<div><span class='text-slate-500'>" + t("cal_plate") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(a.plate) + "</span></div>" +
-      "<div><span class='text-slate-500'>" + t("cal_number") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(a.appointment_number) + "</span></div>" +
-      "<div><span class='text-slate-500'>" + t("cal_address") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(a.address || t("cal_no_location")) + "</span></div>" +
-    "</div>";
+  info.appendChild(tagsRow([
+    { label: t("cal_name"), value: a.first_name + " " + a.last_name },
+    { label: t("cal_time"), value: tv.hour + ":" + tv.minute + " " + tv.ampm },
+    { label: t("cal_plate"), value: a.plate },
+    { label: t("cal_number"), value: a.appointment_number },
+    { label: t("cal_address"), value: a.address || t("cal_no_location") },
+  ]));
   var badge = document.createElement("span");
   badge.className = "text-xs px-2 py-1 rounded-full " + statusBadgeClass(a.status);
   badge.textContent = statusLabel(a.status);
   info.appendChild(badge);
   row.appendChild(info);
+  if (a.vehicle_id != null) {
+    var viewLink = document.createElement("button");
+    viewLink.type = "button";
+    viewLink.className = "cal-vehicle-link text-blue-600 hover:text-blue-800 underline text-xs font-medium mb-3";
+    viewLink.dataset.vehicleId = a.vehicle_id;
+    viewLink.textContent = t("cal_view_details");
+    row.appendChild(viewLink);
+  }
+
+  var viewLink = row.querySelector(".cal-vehicle-link");
+  if (viewLink) {
+    viewLink.addEventListener("click", function () {
+      currentVehicleId = Number(viewLink.dataset.vehicleId);
+      vehicleDetailBackView = "calendar";
+      showView("vehicle-detail");
+      renderVehicleDetail(currentVehicleId);
+    });
+  }
 
   var actions = document.createElement("div");
   actions.className = "flex flex-wrap items-center gap-2";
@@ -1123,10 +1391,8 @@ function buildApptRow(a, apptTime) {
   var reserved = document.createElement("div");
   reserved.className = "mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-2";
   var reservedInfo = document.createElement("div");
-  reservedInfo.className = "text-sm";
-  reservedInfo.innerHTML =
-    "<span class='text-slate-500'>" + t("cal_reserved") + ":</span> " +
-    "<span class='font-medium text-slate-800'>" + escapeHTML(reservedPeriodText(a, apptTime)) + "</span>";
+  reservedInfo.className = "flex flex-wrap justify-center gap-2";
+  reservedInfo.appendChild(buildInfoTag(t("cal_reserved"), reservedPeriodText(a, apptTime)));
   reserved.appendChild(reservedInfo);
   reserved.appendChild(rowBtn(t("cal_reserved_edit"), "btn-secondary", function () {
     openReservationPicker(a, function () {
@@ -1546,9 +1812,14 @@ function loadAnnouncements() {
       header.className = "flex items-start justify-between gap-2";
       var info = document.createElement("div");
       info.className = "text-sm space-y-1";
-      info.innerHTML =
-        "<div><span class='text-slate-500'>" + t("announce_state") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(isActive ? t("announce_active") : t("announce_inactive")) + "</span> <span class='text-slate-500 ml-3'>" + t("announce_remaining") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(remainingLabel) + "</span></div>" +
-        "<div><span class='text-slate-500'>" + t("announce_text") + ":</span> <span class='font-medium text-slate-800'>" + escapeHTML(a.text) + "</span></div>";
+      info.appendChild(tagsRow([
+        { label: t("announce_state"), value: isActive ? t("announce_active") : t("announce_inactive") },
+        { label: t("announce_remaining"), value: remainingLabel },
+      ]));
+      var textP = document.createElement("p");
+      textP.className = "font-medium text-slate-800 mt-1";
+      textP.textContent = a.text;
+      info.appendChild(textP);
       header.appendChild(info);
       var actions = document.createElement("div");
       actions.className = "flex gap-2 shrink-0";
@@ -1657,14 +1928,32 @@ function renderClients() {
     var row = document.createElement("div");
     row.className = "rounded-xl border border-slate-200 p-4 bg-white flex flex-wrap items-center justify-between gap-3";
     var info = document.createElement("div");
-    info.innerHTML =
-      "<p class='font-medium text-slate-800'>" + escapeHTML(c.first_name + " " + c.last_name) + "</p>" +
-      "<p class='text-sm text-slate-500'>" + escapeHTML(c.email || "—") + " &middot; " + escapeHTML((c.country_code || "") + " " + (c.phone || "")) + "</p>";
+    var name = document.createElement("p");
+    name.className = "font-medium text-slate-800";
+    name.textContent = c.first_name + " " + c.last_name;
+    info.appendChild(name);
+    info.appendChild(tagsRow([
+      { label: t("client_email"), value: c.email || "—" },
+      { label: t("label_phone"), value: (c.country_code || "") + " " + (c.phone || "") },
+    ]));
     row.appendChild(info);
-    var btn = smallBtn(t("clients_email"), "btn-secondary", function () {
+    var right = document.createElement("div");
+    right.className = "flex items-center gap-2 flex-wrap";
+    right.appendChild(smallBtn(t("clients_email"), "btn-secondary", function () {
       openEmailModal(c.email);
-    });
-    row.appendChild(btn);
+    }));
+    if (currentUser && currentUser.role === "admin") {
+      right.appendChild(smallBtn(t("clients_delete"), "btn-danger", function () {
+        showConfirm(t("clients_delete_confirm") + " '" + escapeHTML(c.first_name + " " + c.last_name) + "'?").then(function (ok) {
+          if (!ok) return;
+          window.API.mechanic.deleteClient(c.id).then(function () {
+            loadClients();
+            flash(t("clients_deleted"));
+          }).catch(function (err) { flash(err.message, true); });
+        });
+      }));
+    }
+    row.appendChild(right);
     list.appendChild(row);
   });
 }
@@ -1723,9 +2012,14 @@ function loadUsers() {
       row.className = "rounded-xl border border-slate-200 p-4 bg-white flex flex-wrap items-center justify-between gap-3";
       var info = document.createElement("div");
       var roleLabel = u.role === "admin" ? t("users_role_admin") : t("users_role_mechanic");
-      info.innerHTML =
-        "<p class='font-medium text-slate-800'>" + escapeHTML(u.name) + "</p>" +
-        "<p class='text-sm text-slate-500'>" + escapeHTML(u.email) + " &middot; " + escapeHTML(roleLabel) + "</p>";
+      var name = document.createElement("p");
+      name.className = "font-medium text-slate-800";
+      name.textContent = u.name;
+      info.appendChild(name);
+      info.appendChild(tagsRow([
+        { label: t("client_email"), value: u.email },
+        { label: t("users_role"), value: roleLabel },
+      ]));
       row.appendChild(info);
       var badge = document.createElement("span");
       badge.className = "text-xs px-2 py-1 rounded-full " + (u.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700");
@@ -1832,6 +2126,7 @@ function openResetPasswordModal(u) {
 
 var vehiclesSearchTimer = null;
 var currentVehicleId = null;
+var vehicleDetailBackView = "vehicles";
 
 function ownersLabel(owners) {
   if (!owners || !owners.length) return "";
@@ -1877,14 +2172,18 @@ function renderVehiclesList(q) {
       }
       var info = document.createElement("div");
       info.className = "min-w-0";
-      var visitsLabel = v.visits_count === 1 ? "1 " + t("vehicles_visits") : (v.visits_count + " " + t("vehicles_visits"));
-      var ownerLine = (v.owners && v.owners.length)
-        ? "<p class='text-xs text-brand-700 truncate'>" + escapeHTML(t("vehicles_owner") + ": " + ownersLabel(v.owners)) + "</p>"
-        : "";
-      info.innerHTML =
-        "<p class='font-medium text-slate-800'>" + escapeHTML(v.plate) + "</p>" +
-        "<p class='text-sm text-slate-500 truncate'>" + escapeHTML(v.make + " " + v.model + (v.year ? " (" + v.year + ")" : "")) + " &middot; " + escapeHTML(visitsLabel) + "</p>" +
-        ownerLine;
+      var plateEl = document.createElement("p");
+      plateEl.className = "font-medium text-slate-800";
+      plateEl.textContent = v.plate;
+      info.appendChild(plateEl);
+      var makeModel = [v.make, v.model].filter(Boolean).join(" ") || "—";
+      if (v.year) makeModel += " (" + v.year + ")";
+      var tagItems = [
+        { label: t("vehicles_model"), value: makeModel },
+        { label: t("vehicles_services"), value: v.services_count },
+      ];
+      if (v.owners && v.owners.length) tagItems.push({ label: t("vehicles_owner"), value: ownersLabel(v.owners) });
+      info.appendChild(tagsRow(tagItems));
       left.appendChild(info);
       row.appendChild(left);
       var arrow = document.createElement("span");
@@ -1893,6 +2192,7 @@ function renderVehiclesList(q) {
       row.appendChild(arrow);
       row.addEventListener("click", function () {
         currentVehicleId = v.id;
+        vehicleDetailBackView = "vehicles";
         showView("vehicle-detail");
         renderVehicleDetail(v.id);
       });
@@ -1923,52 +2223,128 @@ function renderVehicleDetail(vehicleId) {
       top.appendChild(img);
     }
     var info = document.createElement("div");
-    info.className = "space-y-1 text-sm flex-1";
-    info.innerHTML =
-      "<p><span class='text-slate-500'>" + escapeHTML(t("vehicles_plate")) + ":</span> <span class='font-medium'>" + escapeHTML(v.plate) + "</span></p>" +
-      "<p><span class='text-slate-500'>" + escapeHTML(t("vehicles_make")) + ":</span> " + escapeHTML(v.make || "—") + "</p>" +
-      "<p><span class='text-slate-500'>" + escapeHTML(t("vehicles_model")) + ":</span> " + escapeHTML(v.model || "—") + "</p>" +
-      "<p><span class='text-slate-500'>" + escapeHTML(t("vehicles_year")) + ":</span> " + escapeHTML(v.year || "—") + "</p>" +
-      "<p><span class='text-slate-500'>" + escapeHTML(t("vehicles_color")) + ":</span> " + escapeHTML(v.color || "—") + "</p>";
+    info.className = "flex flex-wrap justify-center gap-2 flex-1 content-start";
+    var items = [
+      { label: t("vehicles_plate"), value: v.plate },
+      { label: t("vehicles_make"), value: v.make || "—" },
+      { label: t("vehicles_model"), value: v.model || "—" },
+      { label: t("vehicles_year"), value: v.year != null ? v.year : "—" },
+      { label: t("vehicles_color"), value: v.color || "—" },
+    ];
     if (v.owners && v.owners.length) {
-      info.innerHTML += "<p><span class='text-slate-500'>" + escapeHTML(t("vehicles_owner")) + ":</span> <span class='font-medium'>" + escapeHTML(ownersLabel(v.owners)) + "</span></p>";
+      items.push({ label: t("vehicles_owner"), value: ownersLabel(v.owners) });
     }
+    items.forEach(function (it) {
+      var tag = document.createElement("span");
+      tag.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-sm";
+      tag.innerHTML = "<span class='font-bold text-slate-800'>" + escapeHTML(it.label) + "</span> <span class='text-slate-600'>" + escapeHTML(it.value) + "</span>";
+      info.appendChild(tag);
+    });
     top.appendChild(info);
     body.appendChild(top);
 
-    var visitsTitle = document.createElement("h3");
-    visitsTitle.className = "text-lg font-semibold mt-6 mb-3";
-    visitsTitle.textContent = t("visits_title");
-    body.appendChild(visitsTitle);
-
-    var visits = v.visits || [];
-    if (visits.length === 0) {
-      var p = document.createElement("p");
-      p.className = "text-slate-500 text-sm";
-      p.textContent = t("visits_empty");
-      body.appendChild(p);
-    } else {
-      visits.forEach(function (vis) {
-        var item = document.createElement("div");
-        item.className = "rounded-xl border border-slate-200 p-4 bg-white cursor-pointer hover:shadow-sm flex items-center justify-between gap-3";
-        var info2 = document.createElement("div");
-        info2.innerHTML =
-          "<p class='font-medium text-slate-800'>" + escapeHTML(vis.title) + "</p>" +
-          "<p class='text-sm text-slate-500'>" + escapeHTML(formatLongDate(vis.visit_date)) + " &middot; " + (vis.jobs ? vis.jobs.length : 0) + " " + escapeHTML(t("visits_job").toLowerCase()) + "</p>";
-        item.appendChild(info2);
-        var arrow = document.createElement("span");
-        arrow.className = "text-slate-400";
-        arrow.textContent = "→";
-        item.appendChild(arrow);
-        item.addEventListener("click", function () {
-          openVisitView(vehicleId, vis);
-        });
-        body.appendChild(item);
-      });
-    }
+    var panel = document.createElement("div");
+    panel.className = "mt-6";
+    body.appendChild(panel);
+    renderHistoryPanel(panel, v);
   }).catch(function (err) {
     showErrorBox("vehicle-detail-error", err.message || t("error_generic"));
   });
+}
+
+function renderHistoryPanel(panel, vehicle) {
+  panel.innerHTML = "";
+  var head = document.createElement("div");
+  head.className = "flex flex-wrap items-center justify-between gap-3 mb-1";
+  var h = document.createElement("h3");
+  h.className = "text-lg font-semibold";
+  h.textContent = t("services_title");
+  head.appendChild(h);
+  var addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "btn-primary";
+  addBtn.textContent = t("services_add");
+  addBtn.addEventListener("click", function () {
+    openServiceModal(vehicle, null, function () {
+      renderVehicleDetail(vehicle.id);
+      flash(t("services_created"));
+    });
+  });
+  head.appendChild(addBtn);
+  panel.appendChild(head);
+
+  var records = vehicle.service_history || [];
+  if (records.length === 0) {
+    var p = document.createElement("p");
+    p.className = "text-slate-500 text-sm mt-3";
+    p.textContent = t("services_empty");
+    panel.appendChild(p);
+    return;
+  }
+  records.forEach(function (r) {
+    var item = document.createElement("div");
+    item.className = "rounded-xl border border-slate-200 p-4 bg-white cursor-pointer hover:shadow-sm flex items-center gap-3 mt-3";
+    var info = document.createElement("div");
+    info.className = "min-w-0 flex-1";
+    var title = document.createElement("p");
+    title.className = "font-medium text-slate-800";
+    title.textContent = r.title || "—";
+    info.appendChild(title);
+    var tagItems = [
+      { label: t("field_date"), value: formatLongDate(String(r.created_at || "").slice(0, 10)) },
+    ];
+    if (r.mileage != null && r.mileage !== "") {
+      tagItems.push({ label: t("services_mileage"), value: r.mileage + " " + (r.mileage_unit || "km") });
+    }
+    info.appendChild(tagsRow(tagItems));
+    item.appendChild(r.mileage_photo
+      ? thumbHTML(r.mileage_photo)
+      : (function () { var sp = document.createElement("span"); sp.className = "w-12 h-12 shrink-0 rounded-lg border border-slate-200 bg-slate-50"; return sp; })());
+    item.appendChild(info);
+    var total = document.createElement("span");
+    total.className = "text-sm font-semibold text-slate-700 whitespace-nowrap";
+    var sym = (r.price_rows && r.price_rows.length) ? currencySymbol(r.price_rows[0].currency || "CRC") : "₡";
+    total.textContent = t("services_total") + ": " + sym + " " + formatMoney(r.total);
+    item.appendChild(total);
+    item.addEventListener("click", function () {
+      openServiceDetail(r.id, vehicle);
+    });
+    panel.appendChild(item);
+  });
+}
+
+function thumbHTML(src) {
+  var span = document.createElement("span");
+  span.className = "w-12 h-12 shrink-0";
+  span.innerHTML = "<img src='" + escapeHTML(src) + "' class='w-12 h-12 rounded-lg object-cover border border-slate-200'>";
+  return span;
+}
+
+function formatMoney(n) {
+  if (n == null || isNaN(Number(n))) return "0";
+  var s = Number(n).toFixed(2).replace(/\.?0+$/, "");
+  var parts = s.split(".");
+  var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return intPart + (parts.length > 1 ? "." + parts[1] : "");
+}
+
+function currencySymbol(cur) {
+  return cur === "USD" ? "$" : "₡";
+}
+
+function sanitizeAmount(v) {
+  var s = String(v == null ? "" : v).replace(/[^\d.]/g, "");
+  var parts = s.split(".");
+  var intPart = (parts[0] || "").replace(/^0+(?=\d)/, "");
+  var decPart = parts.length > 1 ? "." + parts.slice(1).join("").slice(0, 2) : "";
+  return intPart + decPart;
+}
+
+function formatThousands(v) {
+  var s = sanitizeAmount(v);
+  var parts = s.split(".");
+  var intPart = parts[0] ? parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") : "";
+  return intPart + (parts.length > 1 ? "." + parts[1] : "");
 }
 
 function openVehicleModal(vehicle) {
@@ -2045,190 +2421,412 @@ function openVehicleModal(vehicle) {
 }
 
 /* ================================================================
-   VISITS + JOBS
+   SERVICE HISTORY (Historial de Servicios)
    ================================================================ */
 
-function openVisitModal(vehicleId, visit, onSaved) {
-  var editing = !!visit;
-  var m = openModal(editing ? t("visits_edit_title") : t("visits_add_title"), "");
+function openServiceModal(vehicle, record, onSaved) {
+  var editing = !!record;
+  var m = openModal(editing ? t("services_edit_title") : t("services_add_title"), "");
+  buildServiceForm(m.body, vehicle, record, function () {
+    closeModal();
+    if (onSaved) onSaved();
+  }, closeModal);
+}
+
+function openServiceDetail(recordId, vehicle) {
+  var m = openModal("", "");
+  var box = m.overlay.querySelector(".max-w-xl");
+  if (box) {
+    box.classList.remove("max-w-xl");
+    box.classList.add("max-w-3xl");
+  }
+  var state = { recordId: recordId, vehicle: vehicle || null, record: null, editing: false };
+  var header = document.createElement("div");
+  header.id = "service-detail-header";
+  m.body.appendChild(header);
+
+  function load() {
+    window.API.mechanic.getServiceRecord(recordId).then(function (r) {
+      state.record = r;
+      render();
+    }).catch(function (err) {
+      flash(err.message, true);
+      closeModal();
+    });
+  }
+
+  function render() {
+    header.innerHTML = "";
+    if (!state.record) return;
+    if (state.editing) {
+      buildServiceForm(header, state.vehicle, state.record, function () {
+        state.editing = false;
+        load();
+        flash(t("services_updated"));
+      }, function () {
+        state.editing = false;
+        render();
+      });
+      return;
+    }
+    var r = state.record;
+    var title = document.createElement("h3");
+    title.className = "text-lg font-bold text-slate-800 flex items-center gap-2 flex-wrap";
+    title.textContent = r.title || "—";
+    header.appendChild(title);
+    var meta = document.createElement("div");
+    meta.className = "mt-1";
+    var tagItems = [
+      { label: t("visits_date"), value: formatLongDate(String(r.created_at || "").slice(0, 10)) },
+    ];
+    if (r.mileage != null && r.mileage !== "") {
+      tagItems.push({ label: t("services_mileage"), value: String(r.mileage) + " " + (r.mileage_unit || "km") });
+    }
+    meta.appendChild(tagsRow(tagItems));
+    header.appendChild(meta);
+
+    if (r.diagnosis) header.appendChild(sectionText(t("services_diagnosis"), r.diagnosis));
+
+    if (r.mileage_photo) {
+      var ph = document.createElement("div");
+      ph.className = "mt-3";
+      var pl = document.createElement("p");
+      pl.className = "text-xs font-medium text-slate-500 mb-1";
+      pl.textContent = t("services_mileage_photo");
+      ph.appendChild(pl);
+      ph.appendChild(photoThumb(r.mileage_photo, function () { viewPhoto(r.mileage_photo); }));
+      header.appendChild(ph);
+    }
+
+    if (r.other_photos && r.other_photos.length) {
+      var op = document.createElement("div");
+      op.className = "mt-3";
+      var opl = document.createElement("p");
+      opl.className = "text-xs font-medium text-slate-500 mb-1";
+      opl.textContent = t("services_other_photos");
+      op.appendChild(opl);
+      var og = document.createElement("div");
+      og.className = "flex flex-wrap gap-2";
+      r.other_photos.forEach(function (src) {
+        og.appendChild(photoThumb(src, function () { viewPhoto(src); }));
+      });
+      op.appendChild(og);
+      header.appendChild(op);
+    }
+
+    if (r.price_rows && r.price_rows.length) {
+      header.appendChild(renderPricesTable(r.price_rows));
+    }
+
+    var actions = document.createElement("div");
+    actions.className = "flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-100";
+    actions.appendChild(smallBtn(t("services_edit_title"), "btn-secondary", function () {
+      state.editing = true;
+      render();
+    }));
+    actions.appendChild(smallBtn(t("services_delete"), "btn-danger", function () {
+      showConfirm(t("services_delete_confirm")).then(function (ok) {
+        if (!ok) return;
+        window.API.mechanic.deleteServiceRecord(r.id).then(function () {
+          closeModal();
+          if (currentVehicleId) renderVehicleDetail(currentVehicleId);
+          flash(t("services_deleted"));
+        }).catch(function (err) { flash(err.message, true); });
+      });
+    }));
+    header.appendChild(actions);
+  }
+  load();
+}
+
+function renderPricesTable(rows) {
+  var wrap = document.createElement("div");
+  wrap.className = "mt-4 overflow-hidden rounded-xl border border-slate-200";
+  var table = document.createElement("table");
+  table.className = "w-full text-sm";
+  var thead = document.createElement("thead");
+  var hr = document.createElement("tr");
+  hr.className = "bg-slate-50 text-slate-500";
+  hr.innerHTML =
+    "<th class='text-left px-3 py-2 font-semibold'>" + escapeHTML(t("services_price_type")) + "</th>" +
+    "<th class='text-left px-3 py-2 font-semibold'>" + escapeHTML(t("services_price_description")) + "</th>" +
+    "<th class='text-right px-3 py-2 font-semibold'>" + escapeHTML(t("services_price_amount")) + "</th>";
+  thead.appendChild(hr);
+  table.appendChild(thead);
+  var tbody = document.createElement("tbody");
+  var laborTotal = 0;
+  var partsTotal = 0;
+  rows.forEach(function (row) {
+    var tr = document.createElement("tr");
+    tr.className = "border-t border-slate-100";
+    var amt = row.amount != null && row.amount !== "" ? Number(row.amount) : 0;
+    if (row.kind === "parts") partsTotal += amt;
+    else laborTotal += amt;
+    var kindLabel = row.kind === "parts" ? t("services_price_parts") : t("services_price_labor");
+    var kindCls = row.kind === "parts" ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800";
+    tr.innerHTML =
+      "<td class='px-3 py-2'><span class='text-xs font-semibold px-2 py-0.5 rounded-full " + kindCls + "'>" + escapeHTML(kindLabel) + "</span></td>" +
+      "<td class='px-3 py-2 text-slate-700'>" + escapeHTML(row.description || "—") + "</td>" +
+      "<td class='px-3 py-2 text-right font-medium text-slate-800'>" + escapeHTML(currencySymbol(row.currency || "CRC") + " " + formatMoney(amt)) + "</td>";
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  var foot = document.createElement("div");
+  foot.className = "flex flex-wrap items-center justify-end gap-2 px-3 py-2 bg-slate-50 border-t border-slate-200";
+  var sym = rows.length ? currencySymbol(rows[0].currency || "CRC") : "₡";
+  foot.appendChild(buildInfoTag(t("services_total_labor"), sym + " " + formatMoney(laborTotal)));
+  foot.appendChild(buildInfoTag(t("services_total_parts"), sym + " " + formatMoney(partsTotal)));
+  foot.appendChild(buildInfoTag(t("services_total"), sym + " " + formatMoney(laborTotal + partsTotal)));
+  wrap.appendChild(foot);
+  return wrap;
+}
+
+function buildServiceForm(container, vehicle, record, onSaved, onCancel) {
+  var editing = !!record;
   var form = document.createElement("form");
   form.className = "space-y-4";
+  container.innerHTML = "";
+  container.appendChild(form);
 
   var state = {
-    mileage_photo: visit ? visit.mileage_photo : "",
-    fuel_level_photo: visit ? visit.fuel_level_photo : "",
-    condition_photos: visit ? Object.assign({}, visit.condition_photos || {}) : {},
-    defect_photos: visit ? (visit.defect_photos || []).slice() : [],
-    belongings_photos: visit ? (visit.belongings_photos || []).slice() : [],
-  };
-  var previewRefreshers = [];
-
-  function fieldLabel(text) {
-    var p = document.createElement("label");
-    p.className = "field-label";
-    p.textContent = text;
-    return p;
-  }
-
-  function singlePhotoCell(key, label) {
-    var wrap = document.createElement("div");
-    wrap.appendChild(fieldLabel(label));
-    var body = document.createElement("div");
-    body.className = "flex flex-wrap items-center gap-2";
-    function refresh() {
-      var old = body.querySelector("img");
-      if (old) old.remove();
-      if (state[key]) {
-        var img = document.createElement("img");
-        img.className = "w-24 h-24 rounded-lg object-cover border border-slate-200 cursor-pointer";
-        img.src = state[key];
-        img.addEventListener("click", function () { viewPhoto(state[key]); });
-        body.insertBefore(img, body.firstChild);
-      }
-    }
-    previewRefreshers.push(refresh);
-    refresh();
-    body.appendChild(makeUploadButton(t("vehicles_choose_photo"), function (dataUrl) {
-      state[key] = dataUrl;
-      refresh();
-    }));
-    wrap.appendChild(body);
-    return wrap;
-  }
-
-  function conditionCell(key) {
-    var wrap = document.createElement("div");
-    wrap.appendChild(fieldLabel({
-      front: t("visits_cond_front"),
-      left: t("visits_cond_left"),
-      right: t("visits_cond_right"),
-      rear: t("visits_cond_rear"),
-    }[key]));
-    var body = document.createElement("div");
-    body.className = "flex flex-wrap items-center gap-2";
-    function refresh() {
-      var old = body.querySelector("img");
-      if (old) old.remove();
-      var src = state.condition_photos[key];
-      if (src) {
-        var img = document.createElement("img");
-        img.className = "w-20 h-20 rounded-lg object-cover border border-slate-200 cursor-pointer";
-        img.src = src;
-        img.addEventListener("click", function () { viewPhoto(src); });
-        body.insertBefore(img, body.firstChild);
-      }
-    }
-    previewRefreshers.push(refresh);
-    refresh();
-    body.appendChild(makeUploadButton(t("vehicles_choose_photo"), function (dataUrl) {
-      state.condition_photos[key] = dataUrl;
-      refresh();
-    }));
-    wrap.appendChild(body);
-    return wrap;
-  }
-
-  var copyHtml = "";
-  if (!editing) copyHtml =
-    '<div class="flex items-center gap-2">' +
-    '<input id="visit-copy" type="checkbox" class="w-4 h-4">' +
-    '<label for="visit-copy" class="text-sm text-slate-700">' + escapeHTML(t("visits_copy_label")) + "</label></div>";
-
-  form.innerHTML =
-    '<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">' +
-    '<div><label class="field-label">' + escapeHTML(t("visits_title_label")) + '</label><input id="visit-title" type="text" class="field-input" value="' + escapeHTML(visit ? visit.title : "") + '" required></div>' +
-    '<div><label class="field-label">' + escapeHTML(t("visits_date")) + '</label><input id="visit-date" type="date" class="field-input" value="' + (visit ? visit.visit_date : todayISO()) + '"></div>' +
-    "</div>" +
-    copyHtml;
-
-  var sectionTitle = function (text) {
-    var h = document.createElement("h4");
-    h.className = "text-sm font-semibold text-slate-700 pt-1";
-    h.textContent = text;
-    return h;
+    title: record ? record.title || "" : "",
+    diagnosis: record ? record.diagnosis || "" : "",
+    mileage: record && record.mileage != null && record.mileage !== "" ? String(record.mileage) : "",
+    mileage_unit: record && record.mileage_unit ? record.mileage_unit : "km",
+    mileage_photo: record ? record.mileage_photo || "" : "",
+    other_photos: record ? (record.other_photos || []) : [],
+    rows: record && record.price_rows ? record.price_rows.map(function (r) {
+      return { kind: r.kind || "labor", currency: r.currency || "CRC", description: r.description || "", amount: r.amount != null && r.amount !== "" ? String(r.amount) : "" };
+    }) : [],
   };
 
-  var topPhotos = document.createElement("div");
-  topPhotos.className = "grid grid-cols-1 sm:grid-cols-2 gap-4";
-  topPhotos.appendChild(singlePhotoCell("mileage_photo", t("visits_mileage_photo")));
-  topPhotos.appendChild(singlePhotoCell("fuel_level_photo", t("visits_fuel_photo")));
-  form.appendChild(topPhotos);
+  function fieldLabel(text, required) {
+    var label = document.createElement("label");
+    label.className = "field-label" + (required ? " required" : "");
+    label.textContent = text;
+    return label;
+  }
 
-  form.appendChild(sectionTitle(t("visits_condition_photos")));
-  var condGrid = document.createElement("div");
-  condGrid.className = "grid grid-cols-2 sm:grid-cols-4 gap-3";
-  ["front", "left", "right", "rear"].forEach(function (k) {
-    condGrid.appendChild(conditionCell(k));
-  });
-  form.appendChild(condGrid);
+  var titleField = document.createElement("div");
+  titleField.appendChild(fieldLabel(t("services_title_field"), true));
+  var titleInput = document.createElement("input");
+  titleInput.type = "text";
+  titleInput.className = "field-input";
+  titleInput.placeholder = t("services_title_field");
+  titleInput.value = state.title;
+  titleField.appendChild(titleInput);
+  form.appendChild(titleField);
 
-  form.appendChild(sectionTitle(t("visits_defect_photos")));
-  var defectBox = document.createElement("div");
-  var defectEl = document.createElement("div");
-  defectEl.id = "defect-photos";
-  defectEl.className = "flex flex-wrap gap-2";
-  var defectAdd = makeUploadButton(t("visits_add_photo"), function (dataUrl) {
-    state.defect_photos.push(dataUrl);
-    renderDefects();
-  });
-  defectAdd.classList.add("mt-2");
-  defectBox.appendChild(defectEl);
-  defectBox.appendChild(defectAdd);
-  form.appendChild(defectBox);
+  var diagField = document.createElement("div");
+  diagField.appendChild(fieldLabel(t("services_diagnosis")));
+  var diagTa = document.createElement("textarea");
+  diagTa.className = "field-input";
+  diagTa.rows = 3;
+  diagTa.value = state.diagnosis;
+  diagField.appendChild(diagTa);
+  form.appendChild(diagField);
 
-  var obsGrid = document.createElement("div");
-  obsGrid.className = "grid grid-cols-1 sm:grid-cols-2 gap-4";
-  var obsWrap = document.createElement("div");
-  obsWrap.appendChild(fieldLabel(t("visits_observations")));
-  var obsTa = document.createElement("textarea");
-  obsTa.id = "visit-observations";
-  obsTa.className = "field-input";
-  obsTa.rows = 3;
-  obsTa.value = visit ? visit.observations || "" : "";
-  obsWrap.appendChild(obsTa);
-  obsGrid.appendChild(obsWrap);
-  var belongWrap = document.createElement("div");
-  belongWrap.appendChild(fieldLabel(t("visits_belongings")));
-  var belongTa = document.createElement("textarea");
-  belongTa.id = "visit-belongings";
-  belongTa.className = "field-input";
-  belongTa.rows = 3;
-  belongTa.value = visit ? visit.belongings || "" : "";
-  belongWrap.appendChild(belongTa);
-  obsGrid.appendChild(belongWrap);
-  form.appendChild(obsGrid);
+  var mileWrap = document.createElement("div");
+  mileWrap.appendChild(fieldLabel(t("services_mileage")));
+  var mileGrid = document.createElement("div");
+  mileGrid.className = "grid grid-cols-1 sm:grid-cols-2 gap-4";
+  var mileBox = document.createElement("div");
+  var mileInput = document.createElement("input");
+  mileInput.id = "svc-mileage";
+  mileInput.type = "number";
+  mileInput.min = "0";
+  mileInput.step = "1";
+  mileInput.className = "field-input";
+  mileInput.value = state.mileage;
+  mileInput.addEventListener("input", function () { state.mileage = mileInput.value; });
+  mileBox.appendChild(mileInput);
+  mileGrid.appendChild(mileBox);
 
-  form.appendChild(sectionTitle(t("visits_belongings_photos")));
-  var belongBox = document.createElement("div");
-  var belongingsEl = document.createElement("div");
-  belongingsEl.id = "belongings-photos";
-  belongingsEl.className = "flex flex-wrap gap-2";
-  var belongAdd = makeUploadButton(t("visits_add_photo"), function (dataUrl) {
-    state.belongings_photos.push(dataUrl);
-    renderBelongings();
-  });
-  belongAdd.classList.add("mt-2");
-  belongBox.appendChild(belongingsEl);
-  belongBox.appendChild(belongAdd);
-  form.appendChild(belongBox);
+  var unitBox = document.createElement("div");
+  unitBox.className = "inline-flex rounded-lg bg-slate-100 p-1 w-full";
+  var unitKm = document.createElement("button");
+  unitKm.type = "button";
+  unitKm.textContent = t("visits_mileage_unit_km");
+  var unitMi = document.createElement("button");
+  unitMi.type = "button";
+  unitMi.textContent = t("visits_mileage_unit_mi");
+  unitBox.appendChild(unitKm);
+  unitBox.appendChild(unitMi);
+  function setMileageUnit(u) {
+    state.mileage_unit = u;
+    var active = "flex-1 px-4 py-2 text-sm font-semibold rounded-md bg-white text-brand-700 shadow-sm";
+    var idle = "flex-1 px-4 py-2 text-sm font-semibold rounded-md text-slate-600 hover:text-slate-800";
+    unitKm.className = u === "km" ? active : idle;
+    unitMi.className = u === "mi" ? active : idle;
+  }
+  unitKm.addEventListener("click", function () { setMileageUnit("km"); });
+  unitMi.addEventListener("click", function () { setMileageUnit("mi"); });
+  setMileageUnit(state.mileage_unit);
+  mileGrid.appendChild(unitBox);
+  mileWrap.appendChild(mileGrid);
+
+  var photoBox = document.createElement("div");
+  photoBox.className = "mt-2 flex flex-wrap items-center gap-2";
+  var photoPreview = document.createElement("div");
+  photoPreview.className = "flex flex-wrap gap-2";
+  function renderPhoto() {
+    photoPreview.innerHTML = "";
+    if (state.mileage_photo) {
+      var wrap = document.createElement("div");
+      wrap.className = "relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200";
+      var img = document.createElement("img");
+      img.src = state.mileage_photo;
+      img.className = "w-full h-full object-cover cursor-pointer";
+      img.addEventListener("click", function () { viewPhoto(state.mileage_photo); });
+      var rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "absolute top-0 right-0 bg-red-500 text-white text-xs w-5 h-5 rounded-full leading-none";
+      rm.textContent = "×";
+      rm.addEventListener("click", function () { state.mileage_photo = ""; renderPhoto(); renderPhotoReq(); });
+      wrap.appendChild(img);
+      wrap.appendChild(rm);
+      photoPreview.appendChild(wrap);
+    }
+  }
+  renderPhoto();
+  photoBox.appendChild(photoPreview);
+  var photoReq = document.createElement("span");
+  photoReq.className = "text-red-500 font-bold text-base";
+  photoReq.textContent = "*";
+  photoReq.title = t("services_mileage_photo_required");
+  photoBox.appendChild(photoReq);
+  function renderPhotoReq() {
+    photoReq.style.display = state.mileage_photo ? "none" : "";
+  }
+  renderPhotoReq();
+  photoBox.appendChild(makeUploadButton(t("services_mileage_photo_btn"), function (dataUrl) {
+    state.mileage_photo = dataUrl;
+    renderPhoto();
+    renderPhotoReq();
+  }));
+  mileWrap.appendChild(photoBox);
+  form.appendChild(mileWrap);
+
+  form.appendChild(priceRowsForm(state));
 
   var errBox = document.createElement("div");
-  errBox.id = "visit-error";
+  errBox.id = "service-error";
   errBox.className = "hidden rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3";
   form.appendChild(errBox);
+
   var submitBtn = document.createElement("button");
   submitBtn.type = "submit";
-  submitBtn.className = "btn-primary w-full";
-  submitBtn.textContent = t("vehicles_save");
-  form.appendChild(submitBtn);
+  submitBtn.className = "btn-primary flex-1";
+  submitBtn.textContent = t("services_save");
+  var cancelBtn = rowBtn(t("btn_cancel"), "btn-secondary", onCancel);
+  var btnRow = document.createElement("div");
+  btnRow.className = "flex gap-2";
+  btnRow.appendChild(submitBtn);
+  btnRow.appendChild(cancelBtn);
+  form.appendChild(btnRow);
 
-  m.body.appendChild(form);
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    hideBox("service-error");
+    var title = titleInput.value.trim();
+    if (!title) {
+      showErrorBox("service-error", t("services_title_required"));
+      return;
+    }
+    if (!state.mileage_photo) {
+      showErrorBox("service-error", t("services_mileage_photo_required"));
+      return;
+    }
+    var payload = {
+      title: title,
+      diagnosis: diagTa.value,
+      mileage: state.mileage === "" ? null : parseInt(state.mileage, 10),
+      mileage_unit: state.mileage_unit,
+      mileage_photo: state.mileage_photo,
+      other_photos: state.other_photos || [],
+      price_rows: state.rows.map(function (r) {
+        return {
+          kind: r.kind,
+          currency: r.currency || state.currency || "CRC",
+          description: r.description,
+          amount: r.amount === "" ? null : parseFloat(sanitizeAmount(r.amount)),
+        };
+      }),
+    };
+    var btn = form.querySelector("button[type=submit]");
+    btn.disabled = true;
+    var promise = editing
+      ? window.API.mechanic.updateServiceRecord(record.id, payload)
+      : window.API.mechanic.createServiceRecord(vehicle.id, payload);
+    promise.then(function () {
+      if (onSaved) onSaved();
+    }).catch(function (err) {
+      btn.disabled = false;
+      showErrorBox("service-error", err.message || t("error_generic"));
+    });
+  });
+}
 
-  function renderMulti(listEl, arr, onChange) {
-    listEl.innerHTML = "";
-    arr.forEach(function (src, idx) {
-      var wrap = document.createElement("div");
-      wrap.className = "relative w-20 h-20 rounded-lg overflow-hidden border border-slate-200";
+function priceRowsForm(state) {
+  var wrap = document.createElement("div");
+  var h = document.createElement("h4");
+  h.className = "font-semibold text-slate-700 text-sm";
+  h.textContent = t("services_prices_title");
+  wrap.appendChild(h);
+
+  if (!state.currency) state.currency = state.rows.length ? (state.rows[0].currency || "CRC") : "CRC";
+
+  var curBox = document.createElement("div");
+  curBox.className = "mt-2 flex flex-wrap items-center gap-2";
+  var curLabel = document.createElement("span");
+  curLabel.className = "text-xs font-medium text-slate-500";
+  curLabel.textContent = t("services_currency");
+  curBox.appendChild(curLabel);
+  var curToggle = document.createElement("div");
+  curToggle.className = "inline-flex rounded-lg bg-slate-100 p-1";
+  var curCrc = document.createElement("button");
+  curCrc.type = "button";
+  curCrc.textContent = t("services_currency_crc");
+  var curUsd = document.createElement("button");
+  curUsd.type = "button";
+  curUsd.textContent = t("services_currency_usd");
+  curToggle.appendChild(curCrc);
+  curToggle.appendChild(curUsd);
+  function setCurrency(c) {
+    state.currency = c;
+    state.rows.forEach(function (r) { r.currency = c; });
+    render();
+  }
+  curCrc.addEventListener("click", function () { setCurrency("CRC"); });
+  curUsd.addEventListener("click", function () { setCurrency("USD"); });
+  curBox.appendChild(curToggle);
+  wrap.appendChild(curBox);
+
+  var list = document.createElement("div");
+  list.className = "space-y-2 mt-3";
+
+  var btnsRow = document.createElement("div");
+  btnsRow.className = "flex flex-wrap items-center gap-2 mt-3";
+  var addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "btn-secondary !px-4 !py-2 text-sm";
+  addBtn.textContent = t("services_price_add");
+  btnsRow.appendChild(addBtn);
+
+  var otherBtn = document.createElement("button");
+  otherBtn.type = "button";
+  otherBtn.className = "btn-secondary !px-4 !py-2 text-sm";
+  otherBtn.textContent = t("services_other_photos");
+  btnsRow.appendChild(otherBtn);
+
+  var otherBox = document.createElement("div");
+  otherBox.className = "flex flex-wrap gap-2 mt-2";
+  function renderOtherPhotos() {
+    otherBox.innerHTML = "";
+    (state.other_photos || []).forEach(function (src, i) {
+      var pw = document.createElement("div");
+      pw.className = "relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200";
       var img = document.createElement("img");
       img.src = src;
       img.className = "w-full h-full object-cover cursor-pointer";
@@ -2237,278 +2835,146 @@ function openVisitModal(vehicleId, visit, onSaved) {
       rm.type = "button";
       rm.className = "absolute top-0 right-0 bg-red-500 text-white text-xs w-5 h-5 rounded-full leading-none";
       rm.textContent = "×";
-      rm.addEventListener("click", function () {
-        arr.splice(idx, 1);
-        onChange();
+      rm.addEventListener("click", function () { state.other_photos.splice(i, 1); renderOtherPhotos(); });
+      pw.appendChild(img);
+      pw.appendChild(rm);
+      otherBox.appendChild(pw);
+    });
+  }
+  renderOtherPhotos();
+  otherBtn.addEventListener("click", function () {
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.multiple = true;
+    input.style.display = "none";
+    document.body.appendChild(input);
+    input.addEventListener("change", function () {
+      var files = Array.prototype.slice.call(input.files || []);
+      files.forEach(function (f) {
+        if (f.size > 3 * 1024 * 1024) { flash(t("vehicles_photo_too_large"), true); return; }
+        readFileAsDataURL(f).then(function (dataUrl) {
+          state.other_photos.push(dataUrl);
+          renderOtherPhotos();
+        }).catch(function () {});
       });
-      wrap.appendChild(img);
-      wrap.appendChild(rm);
-      listEl.appendChild(wrap);
+      input.remove();
     });
-  }
-
-  function renderDefects() {
-    renderMulti(defectEl, state.defect_photos, renderDefects);
-  }
-  function renderBelongings() {
-    renderMulti(belongingsEl, state.belongings_photos, renderBelongings);
-  }
-  renderDefects();
-  renderBelongings();
-
-  var copyCheck = $("visit-copy");
-  if (copyCheck) {
-    copyCheck.addEventListener("change", function () {
-      if (!copyCheck.checked) return;
-      window.API.mechanic.getVehicle(vehicleId).then(function (v) {
-        var prevs = (v.visits || []);
-        if (!prevs.length) return;
-        var last = prevs[0];
-        state.mileage_photo = last.mileage_photo || "";
-        state.fuel_level_photo = last.fuel_level_photo || "";
-        state.condition_photos = Object.assign({}, last.condition_photos || {});
-        state.defect_photos = (last.defect_photos || []).slice();
-        state.belongings_photos = (last.belongings_photos || []).slice();
-        renderDefects();
-        renderBelongings();
-        previewRefreshers.forEach(function (fn) { fn(); });
-        flash(t("visits_copy_done"));
-      }).catch(function () {});
-    });
-  }
-
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    hideBox("visit-error");
-    var title = $("visit-title").value.trim();
-    if (!title) {
-      showErrorBox("visit-error", t("visits_title_required"));
-      return;
-    }
-    var payload = {
-      title: title,
-      visit_date: $("visit-date").value || todayISO(),
-      mileage_photo: state.mileage_photo,
-      fuel_level_photo: state.fuel_level_photo,
-      condition_photos: state.condition_photos,
-      defect_photos: state.defect_photos,
-      observations: $("visit-observations").value,
-      belongings: $("visit-belongings").value,
-      belongings_photos: state.belongings_photos,
-      jobs: visit ? (visit.jobs || []) : [],
-    };
-    var btn = form.querySelector("button[type=submit]");
-    btn.disabled = true;
-    var promise = editing
-      ? window.API.mechanic.updateVehicleVisit(visit.id, payload)
-      : window.API.mechanic.addVehicleVisit(vehicleId, payload);
-    promise.then(function () {
-      btn.disabled = false;
-      closeModal();
-      if (onSaved) onSaved();
-    }).catch(function (err) {
-      btn.disabled = false;
-      var msg = err.message || t("error_generic");
-      if (/already exists/i.test(msg)) msg = t("visits_title_duplicate");
-      showErrorBox("visit-error", msg);
-    });
-  });
-}
-
-function openVisitView(vehicleId, visit) {
-  var m = openModal(visit.title, "");
-  var tabs = document.createElement("div");
-  tabs.className = "flex gap-2 mb-4 border-b border-slate-200";
-  var tabVal = document.createElement("button");
-  tabVal.type = "button";
-  tabVal.className = "px-4 py-2 text-sm font-semibold border-b-2 border-brand-600 text-brand-700";
-  tabVal.textContent = t("visits_tab_valoracion");
-  var tabJobs = document.createElement("button");
-  tabJobs.type = "button";
-  tabJobs.className = "px-4 py-2 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700";
-  tabJobs.textContent = t("visits_tab_jobs");
-  tabs.appendChild(tabVal);
-  tabs.appendChild(tabJobs);
-  m.body.appendChild(tabs);
-
-  var panelVal = document.createElement("div");
-  var panelJobs = document.createElement("div");
-  panelJobs.classList.add("hidden");
-  m.body.appendChild(panelVal);
-  m.body.appendChild(panelJobs);
-
-  var actions = document.createElement("div");
-  actions.className = "flex flex-wrap gap-2 mt-5 pt-4 border-t border-slate-200";
-  var editVisit = smallBtn(t("visits_edit_valoracion"), "btn-secondary", function () {
-    closeModal();
-    openVisitModal(vehicleId, visit, function () {
-      renderVehicleDetail(vehicleId);
-      flash(t("visits_updated"));
-    });
-  });
-  var delVisit = smallBtn(t("visits_delete"), "btn-danger", function () {
-    showConfirm(t("visits_delete_confirm")).then(function (ok) {
-      if (!ok) return;
-      window.API.mechanic.deleteVehicleVisit(visit.id).then(function () {
-        closeModal();
-        renderVehicleDetail(vehicleId);
-        flash(t("visits_deleted"));
-      }).catch(function (err) { flash(err.message, true); });
-    });
-  });
-  actions.appendChild(editVisit);
-  actions.appendChild(delVisit);
-  m.body.appendChild(actions);
-
-  function renderValoracion() {
-    panelVal.innerHTML = "";
-    var grid = document.createElement("div");
-    grid.className = "grid grid-cols-2 sm:grid-cols-3 gap-3";
-    var items = [];
-    if (visit.mileage_photo) items.push({ label: t("visits_mileage_photo"), src: visit.mileage_photo });
-    if (visit.fuel_level_photo) items.push({ label: t("visits_fuel_photo"), src: visit.fuel_level_photo });
-    var condLabels = { front: t("visits_cond_front"), left: t("visits_cond_left"), right: t("visits_cond_right"), rear: t("visits_cond_rear") };
-    ["front", "left", "right", "rear"].forEach(function (k) {
-      if (visit.condition_photos && visit.condition_photos[k]) {
-        items.push({ label: condLabels[k], src: visit.condition_photos[k] });
-      }
-    });
-    if (items.length === 0) {
-      var p = document.createElement("p");
-      p.className = "text-slate-500 text-sm";
-      p.textContent = t("visits_no_photos");
-      grid.appendChild(p);
-    }
-    items.forEach(function (it) {
-      var cell = document.createElement("div");
-      cell.innerHTML = "<p class='text-xs font-medium text-slate-500 mb-1'>" + escapeHTML(it.label) + "</p>";
-      var img = document.createElement("img");
-      img.src = it.src;
-      img.className = "w-full h-24 object-cover rounded-lg border border-slate-200 cursor-pointer";
-      img.addEventListener("click", function () { viewPhoto(it.src); });
-      cell.appendChild(img);
-      grid.appendChild(cell);
-    });
-    panelVal.appendChild(grid);
-
-    if (visit.defect_photos && visit.defect_photos.length) {
-      var dh = document.createElement("h4");
-      dh.className = "font-semibold text-slate-700 mt-4 mb-2";
-      dh.textContent = t("visits_defect_photos");
-      panelVal.appendChild(dh);
-      var dgrid = document.createElement("div");
-      dgrid.className = "flex flex-wrap gap-2";
-      visit.defect_photos.forEach(function (src) {
-        var thumb = photoThumb(src, function () { viewPhoto(src); });
-        dgrid.appendChild(thumb);
-      });
-      panelVal.appendChild(dgrid);
-    }
-
-    if (visit.belongings_photos && visit.belongings_photos.length) {
-      var bh = document.createElement("h4");
-      bh.className = "font-semibold text-slate-700 mt-4 mb-2";
-      bh.textContent = t("visits_belongings_photos");
-      panelVal.appendChild(bh);
-      var bgrid = document.createElement("div");
-      bgrid.className = "flex flex-wrap gap-2";
-      visit.belongings_photos.forEach(function (src) {
-        bgrid.appendChild(photoThumb(src, function () { viewPhoto(src); }));
-      });
-      panelVal.appendChild(bgrid);
-    }
-
-    if (visit.observations) {
-      panelVal.appendChild(sectionText(t("visits_observations"), visit.observations));
-    }
-    if (visit.belongings) {
-      panelVal.appendChild(sectionText(t("visits_belongings"), visit.belongings));
-    }
-  }
-
-  function renderJobs() {
-    panelJobs.innerHTML = "";
-    var addBtn = document.createElement("button");
-    addBtn.type = "button";
-    addBtn.className = "btn-secondary mb-3";
-    addBtn.textContent = t("visits_add_job");
-    addBtn.addEventListener("click", function () {
-      openJobModal(visit, function (jobs) {
-        visit.jobs = jobs;
-        renderJobs();
-      });
-    });
-    panelJobs.appendChild(addBtn);
-
-    if (!visit.jobs || visit.jobs.length === 0) {
-      var p = document.createElement("p");
-      p.className = "text-slate-500 text-sm";
-      p.textContent = t("visits_no_jobs");
-      panelJobs.appendChild(p);
-      return;
-    }
-    visit.jobs.forEach(function (job, idx) {
-      var card = document.createElement("div");
-      card.className = "rounded-lg border border-slate-200 p-4 mb-3";
-      if (job.diagnostic) {
-        card.appendChild(sectionText(t("visits_diagnostic"), job.diagnostic));
-      }
-      if (job.observations) {
-        card.appendChild(sectionText(t("visits_observations"), job.observations));
-      }
-      if (job.photos && job.photos.length) {
-        var grid = document.createElement("div");
-        grid.className = "flex flex-wrap gap-2 mt-2";
-        job.photos.forEach(function (src) {
-          grid.appendChild(photoThumb(src, function () { viewPhoto(src); }));
-        });
-        card.appendChild(grid);
-      }
-      var row = document.createElement("div");
-      row.className = "flex gap-2 mt-3";
-      var editBtn = smallBtn(t("users_edit"), "btn-secondary", function () {
-        openJobModal(visit, function (jobs) {
-          visit.jobs = jobs;
-          renderJobs();
-        }, idx);
-      });
-      var delBtn = smallBtn(t("announce_delete"), "btn-danger", function () {
-        showConfirm(t("jobs_delete_confirm")).then(function (ok) {
-          if (!ok) return;
-          visit.jobs.splice(idx, 1);
-          saveJobs(visit, function () { renderJobs(); });
-        });
-      });
-      row.appendChild(editBtn);
-      row.appendChild(delBtn);
-      card.appendChild(row);
-      panelJobs.appendChild(card);
-    });
-  }
-
-  function saveJobs(v, done) {
-    window.API.mechanic.updateVehicleVisit(v.id, { jobs: v.jobs || [] }).then(function () {
-      if (done) done();
-    }).catch(function (err) {
-      flash(err.message, true);
-    });
-  }
-
-  tabVal.addEventListener("click", function () {
-    tabVal.className = "px-4 py-2 text-sm font-semibold border-b-2 border-brand-600 text-brand-700";
-    tabJobs.className = "px-4 py-2 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700";
-    panelVal.classList.remove("hidden");
-    panelJobs.classList.add("hidden");
-  });
-  tabJobs.addEventListener("click", function () {
-    tabJobs.className = "px-4 py-2 text-sm font-semibold border-b-2 border-brand-600 text-brand-700";
-    tabVal.className = "px-4 py-2 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700";
-    panelJobs.classList.remove("hidden");
-    panelVal.classList.add("hidden");
+    input.click();
   });
 
-  renderValoracion();
-  renderJobs();
+  function totals() {
+    var labor = 0;
+    var parts = 0;
+    state.rows.forEach(function (r) {
+      var amt = r.amount && !isNaN(parseFloat(r.amount)) ? parseFloat(r.amount) : 0;
+      if (r.kind === "parts") parts += amt;
+      else labor += amt;
+    });
+    return { labor: labor, parts: parts, total: labor + parts };
+  }
+
+  var foot = null;
+  function renderFoot() {
+    var tot = totals();
+    if (foot) foot.remove();
+    foot = document.createElement("div");
+    foot.className = "flex flex-wrap items-center justify-end gap-2 mt-2";
+    var sym = currencySymbol(state.currency || "CRC");
+    foot.appendChild(buildInfoTag(t("services_total_labor"), sym + " " + formatMoney(tot.labor)));
+    foot.appendChild(buildInfoTag(t("services_total_parts"), sym + " " + formatMoney(tot.parts)));
+    foot.appendChild(buildInfoTag(t("services_total"), sym + " " + formatMoney(tot.total)));
+    list.appendChild(foot);
+  }
+
+  function render() {
+    list.innerHTML = "";
+    if (state.rows.length === 0) {
+      var empty = document.createElement("p");
+      empty.className = "text-slate-500 text-sm";
+      empty.textContent = t("services_prices_empty");
+      list.appendChild(empty);
+    }
+    state.rows.forEach(function (row, idx) {
+      var tr = document.createElement("div");
+      tr.className = "rounded-xl border border-slate-200 p-3 bg-white";
+      var typeBtns = document.createElement("div");
+      typeBtns.className = "inline-flex rounded-lg bg-slate-100 p-1 mb-2";
+      ["labor", "parts"].forEach(function (kind) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = kind === "parts" ? t("services_price_parts") : t("services_price_labor");
+        var on = row.kind === kind;
+        b.className = "px-4 py-1.5 text-xs font-semibold rounded-md " + (on ? "bg-white text-brand-700 shadow-sm" : "text-slate-600 hover:text-slate-800");
+        b.addEventListener("click", function () { row.kind = kind; render(); });
+        typeBtns.appendChild(b);
+      });
+      tr.appendChild(typeBtns);
+      var fields = document.createElement("div");
+      fields.className = "grid grid-cols-1 sm:grid-cols-2 gap-2";
+      var descBox = document.createElement("div");
+      var descLabel = document.createElement("p");
+      descLabel.className = "text-xs font-medium text-slate-500 mb-1";
+      descLabel.textContent = t("services_price_description");
+      var desc = document.createElement("input");
+      desc.type = "text";
+      desc.className = "field-input";
+      desc.placeholder = t("services_price_description");
+      desc.value = row.description;
+      desc.addEventListener("input", function () { row.description = desc.value; });
+      descBox.appendChild(descLabel);
+      descBox.appendChild(desc);
+      fields.appendChild(descBox);
+      var amtBox = document.createElement("div");
+      var amtLabel = document.createElement("p");
+      amtLabel.className = "text-xs font-medium text-slate-500 mb-1";
+      amtLabel.textContent = t("services_price_amount");
+      var amtWrap = document.createElement("div");
+      amtWrap.className = "flex items-center gap-1";
+      var sym = document.createElement("span");
+      sym.className = "text-slate-500 font-medium";
+      sym.textContent = currencySymbol(row.currency || "CRC");
+      var amt = document.createElement("input");
+      amt.type = "text";
+      amt.inputMode = "decimal";
+      amt.className = "field-input";
+      amt.placeholder = "0";
+      amt.value = formatThousands(row.amount || "");
+      amt.addEventListener("input", function () {
+        var clean = sanitizeAmount(amt.value);
+        row.amount = clean;
+        amt.value = formatThousands(clean);
+        renderFoot();
+      });
+      amtWrap.appendChild(sym);
+      amtWrap.appendChild(amt);
+      amtBox.appendChild(amtLabel);
+      amtBox.appendChild(amtWrap);
+      fields.appendChild(amtBox);
+      var rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "btn-danger !px-3 !py-2 text-sm sm:col-span-2 justify-self-end";
+      rm.textContent = "×";
+      rm.addEventListener("click", function () { state.rows.splice(idx, 1); render(); });
+      fields.appendChild(rm);
+      tr.appendChild(fields);
+      list.appendChild(tr);
+    });
+    renderFoot();
+  }
+  addBtn.addEventListener("click", function () {
+    state.rows.push({ kind: "labor", currency: state.currency || "CRC", description: "", amount: "" });
+    render();
+  });
+  var active = "px-4 py-1.5 text-sm font-semibold rounded-md bg-white text-brand-700 shadow-sm";
+  var idle = "px-4 py-1.5 text-sm font-semibold rounded-md text-slate-600 hover:text-slate-800";
+  curCrc.className = (state.currency || "CRC") === "CRC" ? active : idle;
+  curUsd.className = (state.currency || "CRC") === "USD" ? active : idle;
+  wrap.appendChild(list);
+  wrap.appendChild(btnsRow);
+  wrap.appendChild(otherBox);
+  render();
+  return wrap;
 }
 
 function sectionText(label, text) {
@@ -2525,88 +2991,6 @@ function sectionText(label, text) {
   return wrap;
 }
 
-function openJobModal(visit, onSave, editIndex) {
-  var editing = editIndex !== undefined;
-  var job = editing ? visit.jobs[editIndex] : { diagnostic: "", observations: "", photos: [] };
-  var m = openModal(editing ? t("jobs_edit_title") : t("jobs_add_title"), "");
-  var form = document.createElement("form");
-  form.className = "space-y-4";
-  form.innerHTML =
-    '<div><label class="field-label">' + escapeHTML(t("visits_diagnostic")) + '</label><textarea id="job-diag" class="field-input" rows="3">' + escapeHTML(job.diagnostic || "") + "</textarea></div>" +
-    '<div><label class="field-label">' + escapeHTML(t("visits_observations")) + '</label><textarea id="job-obs" class="field-input" rows="2">' + escapeHTML(job.observations || "") + "</textarea></div>" +
-    '<div><label class="field-label">' + escapeHTML(t("visits_job_photos")) + "</label>" +
-    '<div id="job-photos" class="flex flex-wrap gap-2"></div>' +
-    '<button type="button" class="btn-secondary mt-2" id="job-add-photo">' + escapeHTML(t("visits_add_photo")) + "</button></div>" +
-    '<div id="job-error" class="hidden rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3"></div>' +
-    '<button type="submit" class="btn-primary w-full">' + escapeHTML(t("vehicles_save")) + "</button>";
-  m.body.appendChild(form);
-
-  var photos = (job.photos || []).slice();
-  var photosEl = $("job-photos");
-
-  function renderJobPhotos() {
-    photosEl.innerHTML = "";
-    photos.forEach(function (src, idx) {
-      var wrap = document.createElement("div");
-      wrap.className = "relative w-20 h-20 rounded-lg overflow-hidden border border-slate-200";
-      var img = document.createElement("img");
-      img.src = src;
-      img.className = "w-full h-full object-cover cursor-pointer";
-      img.addEventListener("click", function () { viewPhoto(src); });
-      var rm = document.createElement("button");
-      rm.type = "button";
-      rm.className = "absolute top-0 right-0 bg-red-500 text-white text-xs w-5 h-5 rounded-full leading-none";
-      rm.textContent = "×";
-      rm.addEventListener("click", function () {
-        photos.splice(idx, 1);
-        renderJobPhotos();
-      });
-      wrap.appendChild(img);
-      wrap.appendChild(rm);
-      photosEl.appendChild(wrap);
-    });
-  }
-  renderJobPhotos();
-
-  $("job-add-photo").addEventListener("click", function () {
-    var input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.style.display = "none";
-    document.body.appendChild(input);
-    input.addEventListener("change", function () {
-      fileToDataURL(input, 3 * 1024 * 1024, function (dataUrl) {
-        photos.push(dataUrl);
-        renderJobPhotos();
-      });
-      input.remove();
-    });
-    input.click();
-  });
-
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    hideBox("job-error");
-    var newJob = {
-      diagnostic: $("job-diag").value,
-      observations: $("job-obs").value,
-      photos: photos,
-    };
-    var jobs = (visit.jobs || []).slice();
-    if (editing) jobs[editIndex] = newJob;
-    else jobs.push(newJob);
-    var btn = form.querySelector("button[type=submit]");
-    btn.disabled = true;
-    window.API.mechanic.updateVehicleVisit(visit.id, { jobs: jobs }).then(function () {
-      btn.disabled = false;
-      closeModal();
-      onSave(jobs);
-    }).catch(function (err) {
-      btn.disabled = false;
-      showErrorBox("job-error", err.message || t("error_generic"));
-    });
-  });
-}
 
 /* ================================================================
    SETTINGS
@@ -2978,8 +3362,9 @@ function loadDaysOff() {
       var item = document.createElement("li");
       item.className = "rounded-xl border border-slate-200 p-4 bg-white flex items-center justify-between gap-3";
       var txt = document.createElement("div");
-      var reason = d.reason ? " — " + d.reason : "";
-      txt.innerHTML = "<span class='text-sm text-slate-700 font-medium'>" + escapeHTML(formatLongDate(d.day_off)) + "</span><span class='text-xs text-slate-500'>" + escapeHTML(reason) + "</span>";
+      var tagItems = [{ label: t("field_date"), value: formatLongDate(d.day_off) }];
+      if (d.reason) tagItems.push({ label: t("settings_days_off_reason"), value: d.reason });
+      txt.appendChild(tagsRow(tagItems));
       item.appendChild(txt);
       var rm = smallBtn(t("settings_days_off_remove"), "btn-danger", function () {
         window.API.mechanic.removeDayOff(d.day_off).then(function () {
@@ -3434,17 +3819,6 @@ function attachLandingButtonListeners() {
       });
     });
   }
-
-  var vehDetailAddVisit = $("vehicle-detail-add-visit");
-  if (vehDetailAddVisit) {
-    vehDetailAddVisit.addEventListener("click", function () {
-      if (!currentVehicleId) return;
-      openVisitModal(currentVehicleId, null, function () {
-        renderVehicleDetail(currentVehicleId);
-        flash(t("visits_created"));
-      });
-    });
-  }
 }
 
 function initBackButtons() {
@@ -3462,9 +3836,10 @@ function initBackButtons() {
     var el = $(btn.id);
     if (el) {
       el.addEventListener("click", function () {
-        showView(btn.view);
-        if (btn.view === "vehicles") renderVehiclesList();
-        if (btn.view === "calendar") renderCal();
+        var target = btn.id === "vehicle-detail-back" ? vehicleDetailBackView : btn.view;
+        showView(target);
+        if (target === "vehicles") renderVehiclesList();
+        if (target === "calendar") renderCal();
       });
     }
   });

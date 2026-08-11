@@ -54,16 +54,53 @@ async function api(path, options = {}) {
   if (opts.body && typeof opts.body !== "string") opts.body = JSON.stringify(opts.body);
 
   const url = path.startsWith("/api/") ? path : `/api${path.startsWith("/") ? path : "/" + path}`;
-  const res = await fetch(url, opts);
-  const text = await res.text();
-  const data = text ? (() => { try { return JSON.parse(text); } catch (e) { return text; } })() : null;
-  if (!res.ok) {
-    const err = new Error(extractErrorMessage(data, res));
-    err.status = res.status;
-    err.data = data;
-    throw err;
+  let res = await fetch(url, opts);
+  let data = await parseResponse(res);
+
+  if (res.status === 401 && opts.headers.Authorization) {
+    const refreshed = await refreshClientToken();
+    if (refreshed) {
+      opts.headers.Authorization = "Bearer " + getClientTokens().access;
+      res = await fetch(url, opts);
+      data = await parseResponse(res);
+    }
   }
+
+  if (!res.ok) throw makeApiError(data, res);
   return data;
+}
+
+async function parseResponse(res) {
+  const text = await res.text();
+  return text ? (() => { try { return JSON.parse(text); } catch (e) { return text; } })() : null;
+}
+
+function makeApiError(data, res) {
+  const err = new Error(extractErrorMessage(data, res));
+  err.status = res.status;
+  err.data = data;
+  return err;
+}
+
+let _clientRefreshPromise = null;
+
+async function refreshClientToken() {
+  if (!getClientTokens().refresh) return false;
+  if (!_clientRefreshPromise) {
+    _clientRefreshPromise = window.API.auth.refresh(getClientTokens().refresh)
+      .then(function (res) {
+        setClientTokens({ access_token: res.access_token });
+        return true;
+      })
+      .catch(function () {
+        clearClientSession();
+        return false;
+      })
+      .finally(function () {
+        _clientRefreshPromise = null;
+      });
+  }
+  return _clientRefreshPromise;
 }
 
 function extractErrorMessage(data, res) {
@@ -160,8 +197,12 @@ window.API = {
     me: () => api("/api/auth/me", { headers: clientHeaders() }),
     listVehicles: () => api("/api/auth/vehicles", { headers: clientHeaders() }),
     createVehicle: (payload) => api("/api/auth/vehicles", { method: "POST", body: payload, headers: clientHeaders() }),
+    updateVehicle: (id, payload) => api(`/api/auth/vehicles/${id}`, { method: "PUT", body: payload, headers: clientHeaders() }),
     deleteVehicle: (id) => api(`/api/auth/vehicles/${id}`, { method: "DELETE", headers: clientHeaders() }),
+    listAppointments: () => api("/api/auth/appointments", { headers: clientHeaders() }),
+    listRepairs: () => api("/api/auth/repairs", { headers: clientHeaders() }),
   },
+  refreshClientToken: refreshClientToken,
   mechanic: {
     bootstrapStatus: () => api("/api/mechanic/bootstrap"),
     bootstrap: (payload) => api("/api/mechanic/bootstrap", { method: "POST", body: payload }),
@@ -180,6 +221,9 @@ window.API = {
     testGmail: () => api("/api/mechanic/gmail/test", { method: "POST", headers: mechanicHeaders() }),
     deactivateGmail: () => api("/api/mechanic/gmail/deactivate", { method: "POST", headers: mechanicHeaders() }),
     listClients: () => api("/api/mechanic/clients", { headers: mechanicHeaders() }),
+    listTechnicians: () => api("/api/mechanic/technicians", { headers: mechanicHeaders() }),
+    listClientVehicles: (clientId) => api(`/api/mechanic/clients/${clientId}/vehicles`, { headers: mechanicHeaders() }),
+    deleteClient: (clientId) => api(`/api/mechanic/clients/${clientId}`, { method: "DELETE", headers: mechanicHeaders() }),
     sendEmail: (payload) => api("/api/mechanic/emails/send", { method: "POST", body: payload, headers: mechanicHeaders() }),
     list: (params = {}) => {
       const qs = new URLSearchParams(params).toString();
@@ -223,11 +267,13 @@ window.API = {
     getVehicle: (id) => api(`/api/mechanic/vehicles/${id}`, { headers: mechanicHeaders() }),
     updateVehicle: (id, payload) => api(`/api/mechanic/vehicles/${id}`, { method: "PUT", body: payload, headers: mechanicHeaders() }),
     deleteVehicle: (id) => api(`/api/mechanic/vehicles/${id}`, { method: "DELETE", headers: mechanicHeaders() }),
-    addVehicleVisit: (id, payload) =>
-      api(`/api/mechanic/vehicles/${id}/visits`, { method: "POST", body: payload, headers: mechanicHeaders() }),
-    updateVehicleVisit: (visitId, payload) =>
-      api(`/api/mechanic/visits/${visitId}`, { method: "PUT", body: payload, headers: mechanicHeaders() }),
-    deleteVehicleVisit: (visitId) =>
-      api(`/api/mechanic/visits/${visitId}`, { method: "DELETE", headers: mechanicHeaders() }),
+    listVehicleHistory: (vehicleId) => api(`/api/mechanic/vehicles/${vehicleId}/history`, { headers: mechanicHeaders() }),
+    createServiceRecord: (vehicleId, payload) =>
+      api(`/api/mechanic/vehicles/${vehicleId}/history`, { method: "POST", body: payload, headers: mechanicHeaders() }),
+    getServiceRecord: (recordId) => api(`/api/mechanic/history/${recordId}`, { headers: mechanicHeaders() }),
+    updateServiceRecord: (recordId, payload) =>
+      api(`/api/mechanic/history/${recordId}`, { method: "PUT", body: payload, headers: mechanicHeaders() }),
+    deleteServiceRecord: (recordId) =>
+      api(`/api/mechanic/history/${recordId}`, { method: "DELETE", headers: mechanicHeaders() }),
   },
 };

@@ -220,17 +220,7 @@ def on_startup() -> None:
                     "DROP COLUMN IF EXISTS client_id"
                 )
             )
-        # dedupe vehicles by plate_key: reassign visits + ownership to master, delete dups
-        conn.execute(
-            text(
-                "UPDATE vehicle_visits vv "
-                "SET vehicle_id = v.master_id "
-                "FROM vehicles veh "
-                "JOIN (SELECT plate_key, MIN(id) AS master_id FROM vehicles "
-                "      GROUP BY plate_key HAVING COUNT(*) > 1) v ON veh.plate_key = v.plate_key "
-                "WHERE veh.id <> v.master_id AND vv.vehicle_id = veh.id"
-            )
-        )
+        # dedupe vehicles by plate_key: reassign ownership to master, delete dups
         conn.execute(
             text(
                 "INSERT INTO client_vehicles (client_id, vehicle_id) "
@@ -273,33 +263,30 @@ def on_startup() -> None:
                 "DROP COLUMN IF EXISTS defects"
             )
         )
+        # Service history extras
         conn.execute(
             text(
-                "ALTER TABLE vehicle_visits "
-                "ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT '', "
-                "ADD COLUMN IF NOT EXISTS mileage_photo TEXT NOT NULL DEFAULT '', "
-                "ADD COLUMN IF NOT EXISTS fuel_level_photo TEXT NOT NULL DEFAULT '', "
-                "ADD COLUMN IF NOT EXISTS condition_photos JSON NOT NULL DEFAULT '{}', "
-                "ADD COLUMN IF NOT EXISTS defect_photos JSON NOT NULL DEFAULT '[]', "
-                "ADD COLUMN IF NOT EXISTS observations TEXT NOT NULL DEFAULT '', "
-                "ADD COLUMN IF NOT EXISTS belongings TEXT NOT NULL DEFAULT '', "
-                "ADD COLUMN IF NOT EXISTS belongings_photos JSON NOT NULL DEFAULT '[]', "
-                "ADD COLUMN IF NOT EXISTS jobs JSON NOT NULL DEFAULT '[]'"
+                "ALTER TABLE service_records "
+                "ADD COLUMN IF NOT EXISTS other_photos JSON NOT NULL DEFAULT '[]'"
             )
         )
         conn.execute(
             text(
-                "ALTER TABLE vehicle_visits "
-                "DROP COLUMN IF EXISTS mileage, "
-                "DROP COLUMN IF EXISTS photos, "
-                "DROP COLUMN IF EXISTS defects, "
-                "DROP COLUMN IF EXISTS client_report, "
-                "DROP COLUMN IF EXISTS diagnostic, "
-                "DROP COLUMN IF EXISTS work_done, "
-                "DROP COLUMN IF EXISTS parts, "
-                "DROP COLUMN IF EXISTS cost"
+                "ALTER TABLE service_price_rows "
+                "ADD COLUMN IF NOT EXISTS currency VARCHAR(5) NOT NULL DEFAULT 'CRC'"
             )
         )
+        # The old Valoración / Reparación tables are replaced by the
+        # service_orders module. Drop them (their data was intentionally removed).
+        conn.execute(text("DROP TABLE IF EXISTS vehicle_repairs"))
+        conn.execute(text("DROP TABLE IF EXISTS vehicle_visits"))
+        # The Órdenes de Servicio module has been replaced by the service history
+        # (Historial de Servicios). Drop its tables and data entirely.
+        conn.execute(text("DROP TABLE IF EXISTS order_parts"))
+        conn.execute(text("DROP TABLE IF EXISTS service_works"))
+        conn.execute(text("DROP TABLE IF EXISTS diagnostics"))
+        conn.execute(text("DROP TABLE IF EXISTS vehicle_conditions"))
+        conn.execute(text("DROP TABLE IF EXISTS service_orders"))
         conn.commit()
 
 
