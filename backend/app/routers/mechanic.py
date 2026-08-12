@@ -210,6 +210,34 @@ def delete_user(
     return None
 
 
+@router.get("/reminders", response_model=list[schemas.ReminderOut])
+def list_reminders(user: User = Depends(require_mechanic), db: Session = Depends(get_db)):
+    return [schemas.ReminderOut.model_validate(r) for r in crud.list_reminders(db, user.id)]
+
+
+@router.post("/reminders", response_model=schemas.ReminderOut, status_code=status.HTTP_201_CREATED)
+def create_reminder(
+    payload: schemas.ReminderCreate,
+    user: User = Depends(require_mechanic),
+    db: Session = Depends(get_db),
+):
+    reminder = crud.create_reminder(db, user.id, payload)
+    return schemas.ReminderOut.model_validate(reminder)
+
+
+@router.patch("/reminders/{reminder_id}", response_model=schemas.ReminderOut)
+def update_reminder(
+    reminder_id: int,
+    payload: schemas.ReminderUpdate,
+    user: User = Depends(require_mechanic),
+    db: Session = Depends(get_db),
+):
+    reminder = crud.get_reminder(db, reminder_id, user.id)
+    if not reminder:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    return schemas.ReminderOut.model_validate(crud.update_reminder(db, reminder, payload))
+
+
 @router.post("/users/{user_id}/reset-password", response_model=schemas.UserOut)
 def reset_password(
     user_id: int,
@@ -316,6 +344,68 @@ def gmail_test(user: User = Depends(require_mechanic), db: Session = Depends(get
 @router.post("/gmail/deactivate")
 def gmail_deactivate(user: User = Depends(require_mechanic), db: Session = Depends(get_db)):
     crud.clear_gmail_integration(db)
+    return {"ok": True}
+
+
+# --------------------------------------------------------------------------
+# WhatsApp integration (Kapso)
+# --------------------------------------------------------------------------
+@router.get("/whatsapp/settings", response_model=schemas.WhatsAppSettingsOut)
+def whatsapp_settings(user: User = Depends(require_mechanic), db: Session = Depends(get_db)):
+    s = crud.get_whatsapp_settings(db)
+    return schemas.WhatsAppSettingsOut(
+        configured=bool(s.api_key and s.phone_number_id),
+        activated=s.activated,
+        phone_number_id=s.phone_number_id,
+        test_phone=s.test_phone,
+        updated_at=s.updated_at,
+    )
+
+
+@router.put("/whatsapp/settings", response_model=schemas.WhatsAppSettingsOut)
+def update_whatsapp_settings(
+    payload: schemas.WhatsAppSettingsUpdate,
+    user: User = Depends(require_mechanic),
+    db: Session = Depends(get_db),
+):
+    crud.save_whatsapp_settings(
+        db, payload.api_key, payload.phone_number_id, payload.test_phone
+    )
+    s = crud.get_whatsapp_settings(db)
+    return schemas.WhatsAppSettingsOut(
+        configured=s.activated,
+        activated=s.activated,
+        phone_number_id=s.phone_number_id,
+        test_phone=s.test_phone,
+        updated_at=s.updated_at,
+    )
+
+
+@router.post("/whatsapp/test")
+def whatsapp_test(user: User = Depends(require_mechanic), db: Session = Depends(get_db)):
+    from ..whatsapp_sender import WhatsAppSendError, normalize_phone, send_whatsapp_message
+
+    s = crud.get_whatsapp_settings(db)
+    if not s.activated:
+        raise HTTPException(status_code=400, detail="WhatsApp is not activated")
+    if not s.test_phone:
+        raise HTTPException(
+            status_code=400, detail="Set a test phone number first"
+        )
+    try:
+        send_whatsapp_message(
+            db,
+            normalize_phone("", s.test_phone),
+            "Prueba de WhatsApp / WhatsApp test - Tu integracion funciona correctamente.",
+        )
+    except WhatsAppSendError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@router.post("/whatsapp/deactivate")
+def whatsapp_deactivate(user: User = Depends(require_mechanic), db: Session = Depends(get_db)):
+    crud.clear_whatsapp_integration(db)
     return {"ok": True}
 
 
@@ -432,6 +522,20 @@ def create_appointment(
         address=obj.address,
         client_email=obj.email,
     )
+    from ..whatsapp_sender import send_appointment_created_message
+
+    send_appointment_created_message(
+        db=db,
+        appointment_number=obj.appointment_number,
+        first_name=obj.first_name,
+        last_name=obj.last_name,
+        phone=obj.phone,
+        country_code=obj.country_code,
+        plate=obj.plate,
+        appointment_date=obj.appointment_date,
+        appointment_time=obj.appointment_time,
+        address=obj.address,
+    )
     event_manager.publish("appointment", {"type": "created", "number": obj.appointment_number})
     return obj
 
@@ -451,7 +555,23 @@ def update_status(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Appointment not found",
         )
+    was_confirmed = obj.status == "confirmed"
     result = crud.update_status(db, obj, payload.status)
+    if payload.status == "confirmed" and not was_confirmed:
+        from ..whatsapp_sender import send_appointment_confirmed_message
+
+        send_appointment_confirmed_message(
+            db=db,
+            appointment_number=obj.appointment_number,
+            first_name=obj.first_name,
+            last_name=obj.last_name,
+            phone=obj.phone,
+            country_code=obj.country_code,
+            plate=obj.plate,
+            appointment_date=obj.appointment_date,
+            appointment_time=obj.appointment_time,
+            address=obj.address,
+        )
     event_manager.publish("appointment", {"type": "updated", "number": number, "status": payload.status})
     return result
 

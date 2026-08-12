@@ -115,7 +115,7 @@ class Client(Base):
     id = Column(Integer, primary_key=True, index=True)
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100), nullable=False)
-    email = Column(String(255), nullable=False, unique=True, index=True)
+    email = Column(String(255), nullable=True, unique=True, index=True)
     phone = Column(String(30), nullable=False, server_default="")
     country_code = Column(String(10), nullable=False, server_default="+506")
     password_hash = Column(String(255), nullable=False)
@@ -180,6 +180,28 @@ class User(Base):
     )
 
 
+class MechanicReminder(Base):
+    """Private reminders belonging to a mechanic panel account."""
+
+    __tablename__ = "mechanic_reminders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    text = Column(String(120), nullable=False)
+    is_completed = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
 class GmailSettings(Base):
     """Singleton (id=1) Gmail OAuth integration settings."""
 
@@ -193,6 +215,23 @@ class GmailSettings(Base):
     activated = Column(Boolean, nullable=False, default=False)
     state = Column(String(128), nullable=False, server_default="")
     state_expires = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class WhatsAppSettings(Base):
+    """Singleton (id=1) Kapso WhatsApp integration settings."""
+
+    __tablename__ = "whatsapp_settings"
+
+    id = Column(Integer, primary_key=True)
+    api_key = Column(String(255), nullable=False, server_default="")
+    phone_number_id = Column(String(255), nullable=False, server_default="")
+    test_phone = Column(String(30), nullable=False, server_default="")
+    activated = Column(Boolean, nullable=False, default=False)
     updated_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

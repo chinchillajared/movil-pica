@@ -82,6 +82,149 @@ function showView(viewName) {
   }
   var backHome = $("back-home-btn");
   if (backHome) backHome.classList.toggle("hidden", viewName === "landing");
+  document.querySelectorAll(".sidebar-link[data-view]").forEach(function (link) {
+    link.classList.toggle("active", link.dataset.view === viewName);
+  });
+}
+
+function homeDateOnly(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function homeDateString(date) {
+  return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+}
+
+function loadHomeDashboard() {
+  var appointmentsEl = $("home-appointments");
+  if (!appointmentsEl) return;
+  var today = homeDateOnly(new Date());
+  var weekStart = new Date(today);
+  var day = weekStart.getDay();
+  weekStart.setDate(weekStart.getDate() - (day === 0 ? 6 : day - 1));
+  var weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+
+  Promise.all([
+    window.API.mechanic.list(),
+    window.API.mechanic.listVehicles().catch(function () { return []; }),
+  ]).then(function (results) {
+    var appointments = results[0] || [];
+    var weekAppointments = appointments.filter(function (a) {
+      var date = new Date(String(a.appointment_date) + "T12:00:00");
+      return a.status !== "cancelled" && date >= weekStart && date <= weekEnd;
+    }).sort(function (a, b) {
+      return String(a.appointment_date + " " + a.appointment_time).localeCompare(String(b.appointment_date + " " + b.appointment_time));
+    });
+    var pending = appointments.filter(function (a) { return a.status === "pending"; });
+    var next = appointments.filter(function (a) {
+      var date = new Date(String(a.appointment_date) + "T" + String(a.appointment_time || "00:00"));
+      return a.status !== "cancelled" && a.status !== "completed" && date >= new Date();
+    }).sort(function (a, b) {
+      return String(a.appointment_date + " " + a.appointment_time).localeCompare(String(b.appointment_date + " " + b.appointment_time));
+    })[0];
+
+    $("home-week-count").textContent = weekAppointments.length;
+    $("home-pending-count").textContent = pending.length;
+    $("home-next-date").textContent = next
+      ? formatLongDate(String(next.appointment_date)) + " · " + (function () { var tv = to12(next.appointment_time); return tv.hour + ":" + tv.minute + " " + tv.ampm; })()
+      : t("home_no_appointments");
+    $("home-next-client").textContent = next ? [next.first_name, next.last_name].filter(Boolean).join(" ") + " · " + (next.plate || "") : "";
+
+    appointmentsEl.innerHTML = "";
+    var empty = $("home-appointments-empty");
+    if (!weekAppointments.length) {
+      empty.classList.remove("hidden");
+    } else {
+      empty.classList.add("hidden");
+      weekAppointments.slice(0, 6).forEach(function (a) {
+        var row = document.createElement("div");
+        row.className = "flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5";
+        var time = document.createElement("div");
+        time.className = "w-16 shrink-0 text-sm font-bold text-slate-900";
+        var tv = to12(a.appointment_time);
+        time.textContent = tv.hour + ":" + tv.minute + " " + tv.ampm;
+        var info = document.createElement("div");
+        info.className = "min-w-0 flex-1";
+        info.innerHTML = "<div class='truncate text-sm font-semibold text-slate-800'>" + escapeHTML([a.first_name, a.last_name].filter(Boolean).join(" ") || "—") + "</div><div class='truncate text-xs text-slate-500'>" + escapeHTML(a.plate || "—") + " · " + escapeHTML(formatLongDate(String(a.appointment_date))) + "</div>";
+        var badge = document.createElement("span");
+        badge.className = "shrink-0 rounded-full px-2 py-1 text-xs font-semibold " + statusBadgeClass(a.status);
+        badge.textContent = statusLabel(a.status);
+        row.appendChild(time);
+        row.appendChild(info);
+        row.appendChild(badge);
+        appointmentsEl.appendChild(row);
+      });
+    }
+    loadHomeReminders();
+  }).catch(function () {
+    $("home-week-count").textContent = "—";
+    $("home-pending-count").textContent = "—";
+    loadHomeReminders();
+  });
+}
+
+function renderHomeReminders(items) {
+  var list = $("home-reminders");
+  var empty = $("home-reminders-empty");
+  if (!list || !empty) return;
+  list.innerHTML = "";
+  empty.classList.toggle("hidden", items.length > 0);
+  items.forEach(function (item) {
+    var row = document.createElement("div");
+    row.className = "flex items-start gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5";
+    var text = document.createElement("p");
+    text.className = "flex-1 text-sm text-slate-700";
+    text.textContent = item.text;
+    var done = document.createElement("button");
+    done.type = "button";
+    done.className = "text-xs font-semibold text-brand-700 hover:text-brand-900";
+    done.textContent = t("home_mark_done");
+    done.addEventListener("click", function () {
+      window.API.mechanic.updateReminder(item.id, { is_completed: true }).then(loadHomeReminders);
+    });
+    row.appendChild(text);
+    row.appendChild(done);
+    list.appendChild(row);
+  });
+}
+
+function loadHomeReminders() {
+  window.API.mechanic.listReminders().then(function (items) {
+    renderHomeReminders(items || []);
+  }).catch(function () {
+    renderHomeReminders([]);
+  });
+}
+
+function initHomeDashboard() {
+  loadHomeDashboard();
+  var add = $("home-add-reminder");
+  var form = $("home-reminder-form");
+  var input = $("home-reminder-input");
+  if (add && form && !add.dataset.wired) {
+    add.dataset.wired = "1";
+    add.addEventListener("click", function () {
+      form.classList.toggle("hidden");
+      form.classList.toggle("flex");
+      if (!form.classList.contains("hidden")) input.focus();
+    });
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var text = input.value.trim();
+      if (!text) return;
+      window.API.mechanic.createReminder({ text: text }).then(function () {
+        input.value = "";
+        form.classList.add("hidden");
+        form.classList.remove("flex");
+        loadHomeReminders();
+      });
+    });
+  }
+  var calendar = $("home-calendar-btn");
+  if (calendar && !calendar.dataset.wired) { calendar.dataset.wired = "1"; calendar.addEventListener("click", function () { $("sidebar-calendar").click(); }); }
+  var vehicles = $("home-vehicles-btn");
+  if (vehicles && !vehicles.dataset.wired) { vehicles.dataset.wired = "1"; vehicles.addEventListener("click", function () { $("sidebar-vehicles").click(); }); }
 }
 
 function flash(msg, isError) {
@@ -2211,19 +2354,22 @@ function renderVehicleDetail(vehicleId) {
   hideBox("vehicle-detail-error");
   window.API.mechanic.getVehicle(vehicleId).then(function (v) {
     var title = $("vehicle-detail-title");
-    if (title) title.textContent = v.plate + " — " + v.make + " " + v.model;
+    if (title) title.textContent = t("vehicles_detail_title");
 
     var top = document.createElement("div");
-    top.className = "flex flex-col sm:flex-row gap-4";
-    if (v.front_photo) {
-      var img = document.createElement("img");
-      img.src = v.front_photo;
-      img.className = "w-40 h-40 rounded-xl object-cover border border-slate-200 cursor-pointer";
-      img.addEventListener("click", function () { viewPhoto(v.front_photo); });
-      top.appendChild(img);
-    }
+    top.className = "overflow-hidden rounded-xl border border-slate-200 bg-white";
+    var photoBanner = document.createElement("div");
+    photoBanner.className = "mx-auto mt-3 aspect-square w-full max-w-xs overflow-hidden rounded-xl border border-slate-200 bg-slate-100";
+    var img = document.createElement("img");
+    img.src = v.front_photo || "/icons/car.svg";
+    img.alt = v.plate;
+    img.className = "h-full w-full cursor-pointer " + (v.front_photo ? "object-cover" : "object-contain p-12");
+    img.addEventListener("click", function () { if (v.front_photo) viewPhoto(v.front_photo); });
+    photoBanner.appendChild(img);
+    top.appendChild(photoBanner);
+
     var info = document.createElement("div");
-    info.className = "flex flex-wrap justify-center gap-2 flex-1 content-start";
+    info.className = "grid grid-cols-1 gap-3 p-4 sm:grid-cols-2";
     var items = [
       { label: t("vehicles_plate"), value: v.plate },
       { label: t("vehicles_make"), value: v.make || "—" },
@@ -2235,10 +2381,11 @@ function renderVehicleDetail(vehicleId) {
       items.push({ label: t("vehicles_owner"), value: ownersLabel(v.owners) });
     }
     items.forEach(function (it) {
-      var tag = document.createElement("span");
-      tag.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-sm";
-      tag.innerHTML = "<span class='font-bold text-slate-800'>" + escapeHTML(it.label) + "</span> <span class='text-slate-600'>" + escapeHTML(it.value) + "</span>";
-      info.appendChild(tag);
+      var field = document.createElement("div");
+      field.className = "rounded-lg bg-slate-50 px-3 py-2.5";
+      field.innerHTML = "<div class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + escapeHTML(it.label) + "</div><div class='mt-1 text-sm font-semibold text-slate-900 break-words'>" + escapeHTML(it.value) + "</div>";
+      if (it.label === t("vehicles_owner")) field.className += " sm:col-span-2";
+      info.appendChild(field);
     });
     top.appendChild(info);
     body.appendChild(top);
@@ -2999,6 +3146,7 @@ function sectionText(label, text) {
 var settingsDays = [];
 var apptTimeState = { unit: "hours", value: 2 };
 var gmailLoaded = false;
+var whatsappLoaded = false;
 var settingsWired = false;
 
 function initSettingsView() {
@@ -3011,6 +3159,7 @@ function initSettingsView() {
   initSettingsDaysOff();
   initApptTime();
   initGmail();
+  initWhatsapp();
 }
 
 function wireSettingsTabs() {
@@ -3022,7 +3171,7 @@ function wireSettingsTabs() {
         setSettingsTab(name);
         if (name === "schedule") initSettingsSchedule();
         if (name === "appttime") initApptTime();
-        if (name === "integrations") initGmail();
+        if (name === "integrations") { initGmail(); initWhatsapp(); }
       });
     }
   });
@@ -3618,18 +3767,17 @@ function renderGmail(s) {
   if (!status) return;
   status.innerHTML = "";
 
-  var badge = document.createElement("span");
   if (s.activated) {
+    var badge = document.createElement("span");
     badge.className = "inline-flex items-center rounded-full bg-green-100 text-green-700 text-xs font-semibold px-3 py-1";
     badge.textContent = t("gmail_active");
+    status.appendChild(badge);
   } else if (s.configured) {
+    var badge = document.createElement("span");
     badge.className = "inline-flex items-center rounded-full bg-amber-100 text-amber-700 text-xs font-semibold px-3 py-1";
     badge.textContent = t("gmail_saved_msg");
-  } else {
-    badge.className = "inline-flex items-center rounded-full bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1";
-    badge.textContent = t("integrations_soon");
+    status.appendChild(badge);
   }
-  status.appendChild(badge);
 
   var actions = document.createElement("div");
   actions.className = "flex flex-wrap gap-2 mt-3";
@@ -3707,11 +3855,133 @@ function authorizeGmail() {
   });
 }
 
+function initWhatsapp() {
+  if (whatsappLoaded) return;
+  whatsappLoaded = true;
+  var saveBtn = $("whatsapp-save");
+  if (saveBtn) saveBtn.onclick = saveWhatsapp;
+  window.API.mechanic.getWhatsappSettings().then(renderWhatsapp).catch(function (err) {
+    showErrorBox("whatsapp-msg", err.message || t("error_generic"));
+  });
+}
+
+function renderWhatsapp(s) {
+  var status = $("whatsapp-status");
+  var form = $("whatsapp-form");
+  var apiKey = $("whatsapp-api-key");
+  var phoneId = $("whatsapp-phone-number-id");
+  var testPhone = $("whatsapp-test-phone");
+  if (phoneId) phoneId.value = s.phone_number_id || "";
+  if (testPhone) testPhone.value = s.test_phone || "";
+  if (apiKey) apiKey.value = "";
+  if (!status) return;
+  status.innerHTML = "";
+
+  if (s.activated) {
+    var badge = document.createElement("span");
+    badge.className = "inline-flex items-center rounded-full bg-green-100 text-green-700 text-xs font-semibold px-3 py-1";
+    badge.textContent = t("whatsapp_active");
+    status.appendChild(badge);
+  } else if (s.configured) {
+    var badge = document.createElement("span");
+    badge.className = "inline-flex items-center rounded-full bg-amber-100 text-amber-700 text-xs font-semibold px-3 py-1";
+    badge.textContent = t("whatsapp_configured");
+    status.appendChild(badge);
+  }
+
+  var actions = document.createElement("div");
+  actions.className = "flex flex-wrap gap-2 mt-3";
+
+  if (s.activated) {
+    var testBtn = smallBtn(t("whatsapp_test"), "btn-secondary", function () {
+      window.API.mechanic.testWhatsapp().then(function () {
+        flash(t("whatsapp_test_ok"));
+      }).catch(function (err) {
+        flash(err.message || t("whatsapp_test_fail"), true);
+      });
+    });
+    var deactBtn = smallBtn(t("whatsapp_deactivate"), "btn-danger", function () {
+      showConfirm(t("whatsapp_deactivate_confirm")).then(function (ok) {
+        if (!ok) return;
+        window.API.mechanic.deactivateWhatsapp().then(function () {
+          whatsappLoaded = false;
+          initWhatsapp();
+          flash(t("whatsapp_deactivated_msg"));
+        }).catch(function (err) { flash(err.message, true); });
+      });
+    });
+    actions.appendChild(testBtn);
+    actions.appendChild(deactBtn);
+  } else {
+    var reconfBtn = smallBtn(s.configured ? t("whatsapp_reconfigure") : t("whatsapp_activate"), "btn-secondary", function () {
+      if (form) form.classList.remove("hidden");
+    });
+    actions.appendChild(reconfBtn);
+  }
+  status.appendChild(actions);
+}
+
+function saveWhatsapp() {
+  var msg = $("whatsapp-msg");
+  if (msg) msg.classList.add("hidden");
+  var apiKey = $("whatsapp-api-key").value.trim();
+  var phoneId = $("whatsapp-phone-number-id").value.trim();
+  var testPhone = $("whatsapp-test-phone").value.trim();
+  if (!apiKey || !phoneId) {
+    showErrorBox("whatsapp-msg", t("whatsapp_required"));
+    return;
+  }
+  var btn = $("whatsapp-save");
+  if (btn) btn.disabled = true;
+  window.API.mechanic.updateWhatsappSettings({
+    api_key: apiKey,
+    phone_number_id: phoneId,
+    test_phone: testPhone,
+  }).then(function (res) {
+    if (btn) btn.disabled = false;
+    var form = $("whatsapp-form");
+    if (form) form.classList.add("hidden");
+    showSuccessBox("whatsapp-msg", t("whatsapp_saved_msg"));
+    renderWhatsapp(res);
+  }).catch(function (err) {
+    if (btn) btn.disabled = false;
+    showErrorBox("whatsapp-msg", err.message || t("error_generic"));
+  });
+}
+
 /* ================================================================
    LANDING + BACK BUTTONS
    ================================================================ */
 
 function attachLandingButtonListeners() {
+  var homeBtn = $("sidebar-home");
+  if (homeBtn) {
+    homeBtn.addEventListener("click", function () {
+      showView("landing");
+      initHomeDashboard();
+      var sidebar = $("app-sidebar");
+      if (sidebar) sidebar.classList.add("-translate-x-full");
+    });
+  }
+
+  function mirrorClick(sourceId, targetId) {
+    var source = $(sourceId);
+    var target = $(targetId);
+    if (!source || !target) return;
+    source.addEventListener("click", function () {
+      target.click();
+    });
+  }
+  mirrorClick("sidebar-calendar", "landing-calendar");
+  mirrorClick("sidebar-vehicles", "landing-vehicles");
+  mirrorClick("sidebar-clients", "landing-clients");
+  mirrorClick("sidebar-announce", "landing-announce");
+  mirrorClick("sidebar-settings", "landing-settings");
+  mirrorClick("sidebar-users", "landing-users");
+  var sidebarToggle = $("sidebar-toggle");
+  var sidebar = $("app-sidebar");
+  if (sidebarToggle && sidebar) sidebarToggle.addEventListener("click", function () { sidebar.classList.toggle("-translate-x-full"); });
+
   var calendarBtn = $("landing-calendar");
   if (calendarBtn) {
     calendarBtn.addEventListener("click", function () {
@@ -3850,22 +4120,8 @@ function initBackButtons() {
    ================================================================ */
 
 function restoreView() {
-  var v = localStorage.getItem("mechanic_current_view");
-  if (!v || v === "landing") return;
-  if (v === "calendar") { showView("calendar"); renderCal(); }
-  else if (v === "announce") { showView("announce"); initAnnouncementForm(); loadAnnouncements(); }
-  else if (v === "settings") { showView("settings"); initSettingsView(); }
-  else if (v === "clients") { showView("clients"); loadClients(); }
-  else if (v === "users") { showView("users"); loadUsers(); }
-  else if (v === "vehicles") { showView("vehicles"); renderVehiclesList(); }
-  else if (v === "vehicle-detail") {
-    var id = localStorage.getItem("mechanic_current_vehicle");
-    if (id) {
-      currentVehicleId = Number(id);
-      showView("vehicle-detail");
-      renderVehicleDetail(currentVehicleId);
-    }
-  }
+  showView("landing");
+  initHomeDashboard();
 }
 
 function initDashboard() {
@@ -3876,9 +4132,11 @@ function initDashboard() {
       userEl.textContent = u.name + " · " + roleLabel;
     }
     var usersBtn = $("landing-users");
+    var sidebarUsersBtn = $("sidebar-users");
     if (usersBtn) {
-      if (u.role === "admin") usersBtn.classList.remove("hidden");
-      else usersBtn.classList.add("hidden");
+      var isAdmin = u.role === "admin";
+      usersBtn.classList.toggle("hidden", !isAdmin);
+      if (sidebarUsersBtn) sidebarUsersBtn.classList.toggle("hidden", !isAdmin);
     }
     handleGmailQuery();
     initGearMenu();

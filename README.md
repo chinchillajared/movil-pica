@@ -42,6 +42,12 @@ client management, announcements, settings, and a Gmail email integration.
 - **First-run setup:** with no accounts yet, the login page shows a *Create
   admin* form. The first account created becomes the main administrator
   (`admin`), and it can also **upload a site logo** shown in every header.
+- **Workshop overview:** the `Inicio` screen summarizes appointments this week,
+  pending confirmations, the next appointment, the weekly agenda, and important
+  reminders.
+- **Persistent reminders:** mechanics can create reminders from `Inicio` and
+  mark them as completed. Reminders are stored per mechanic account in
+  PostgreSQL and are available across devices.
 - **Roles:** `admin` (full access + user management + delete clients) and
   `mechanic`.
 - **Appointment calendar:** month view colored by status; clicking a day lists
@@ -123,7 +129,9 @@ password, and optionally upload a logo). That first account has the `admin` role
 
 1. Open `/mechanic/`. On first run, create the admin account; otherwise sign in
    with your email and password.
-2. From the landing page use the shortcuts:
+ 2. From the panel use the navigation:
+    - **Inicio** — review the weekly appointment summary, pending confirmations,
+      next appointment and important reminders.
    - **Calendario de citas** — manage appointments day by day (confirm, complete,
      cancel, delete, edit reservations, jump to vehicle details).
    - **Historial de Vehículos** — search vehicles and open their service-history

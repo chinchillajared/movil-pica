@@ -51,6 +51,17 @@ create/update/delete data may be rate-limited per IP.
 | POST   | `/users/{id}/reset-password` *(admin)* | Reset a user's password |
 | DELETE | `/users/{id}` *(admin)* | Delete user |
 
+### Reminders
+
+Reminders are private to the authenticated mechanic account. Completed reminders
+are not returned by the list endpoint.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET    | `/reminders` | List the current user's pending reminders |
+| POST   | `/reminders` | Create a reminder (`{"text":"..."}`) |
+| PATCH  | `/reminders/{id}` | Update completion state (`{"is_completed":true}`) |
+
 ### Gmail
 
 | Method | Endpoint | Description |

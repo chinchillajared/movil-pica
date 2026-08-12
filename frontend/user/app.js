@@ -721,13 +721,13 @@ function initVehicles() {
 
   function buildVehicleCard(v) {
     var card = document.createElement("div");
-    card.className = "relative rounded-xl border border-slate-200 bg-white p-3 flex flex-col";
+    card.className = "group relative flex min-h-[250px] flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-100 hover:shadow-md";
 
     var menuWrap = document.createElement("div");
     menuWrap.className = "absolute top-2 right-2 z-10";
     var gearBtn = document.createElement("button");
     gearBtn.type = "button";
-    gearBtn.className = "p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50";
+    gearBtn.className = "rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700";
     gearBtn.innerHTML = '<img class="w-4 h-4" src="/icons/gear.svg" alt="" />';
     var menu = document.createElement("div");
     menu.className = "hidden absolute right-0 top-full mt-1 bg-white rounded-xl border border-slate-200 shadow-lg py-1 min-w-[150px] z-20";
@@ -763,33 +763,41 @@ function initVehicles() {
     menuWrap.appendChild(menu);
     card.appendChild(menuWrap);
 
+    var photoBanner = document.createElement("div");
+    photoBanner.className = "mx-auto mb-1 mt-1 aspect-square w-full max-w-[220px] overflow-hidden rounded-xl border border-slate-200 bg-slate-100";
     var photo = document.createElement("img");
-    photo.src = v.front_photo || "";
+    photo.src = v.front_photo || "/icons/car.svg";
     photo.alt = v.plate;
-    photo.className = "w-40 h-40 mx-auto object-cover rounded-2xl border border-slate-200 bg-slate-50" + (v.front_photo ? "" : " hidden");
-    card.appendChild(photo);
+    photo.className = "h-full w-full object-cover";
+    photoBanner.appendChild(photo);
+    card.appendChild(photoBanner);
 
     var info = document.createElement("div");
-    info.className = "mt-3 flex flex-col gap-1.5 items-start";
+    info.className = "mt-4 flex flex-1 flex-col";
+    var title = document.createElement("div");
+    title.className = "pr-8 text-base font-bold text-slate-900";
+    title.textContent = [v.make, v.model].filter(Boolean).join(" ") || t("vehicles_title");
+    info.appendChild(title);
+    var plate = document.createElement("div");
+    plate.className = "mt-0.5 text-sm font-semibold uppercase tracking-wide text-brand-700";
+    plate.textContent = v.plate || "—";
+    info.appendChild(plate);
     var items = [
-      { label: t("vehicles_plate"), value: v.plate },
-      { label: t("vehicles_make"), value: v.make || "—" },
-      { label: t("vehicles_model"), value: v.model || "—" },
       { label: t("vehicles_year"), value: v.year != null ? v.year : "—" },
       { label: t("vehicles_color"), value: v.color || "—" },
     ];
     items.forEach(function (it) {
       var tag = document.createElement("span");
-      tag.className = "inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 bg-white text-sm w-fit";
-      tag.innerHTML = "<span class='font-bold text-slate-800'>" + esc(it.label) + "</span> <span class='text-slate-600'>" + esc(it.value) + "</span>";
+      tag.className = "mt-2 text-sm text-slate-500";
+      tag.innerHTML = "<span class='font-medium text-slate-700'>" + esc(it.label) + ":</span> " + esc(it.value);
       info.appendChild(tag);
     });
     card.appendChild(info);
 
     var repairsBtn = document.createElement("a");
     repairsBtn.href = "/user/repairs.html?vehicle=" + v.id;
-    repairsBtn.className = "btn-secondary flex items-center justify-center gap-2";
-    repairsBtn.innerHTML = esc(t("vehicles_repairs_btn")) + ' <img class="w-5 h-5" src="/icons/wheel.svg" alt="" />';
+    repairsBtn.className = "btn-primary flex w-full items-center justify-center gap-2";
+    repairsBtn.innerHTML = esc(t("vehicles_repairs_btn")) + ' <img class="w-5 h-5" src="/icons/wrench.svg" alt="" />';
     var spacer = document.createElement("div");
     spacer.className = "mt-auto pt-5";
     spacer.appendChild(repairsBtn);
@@ -801,8 +809,8 @@ function initVehicles() {
   function buildAddTile() {
     var tile = document.createElement("button");
     tile.type = "button";
-    tile.className = "rounded-xl border-2 border-dashed border-slate-300 bg-white hover:border-brand-400 hover:text-brand-700 text-slate-500 flex flex-col items-center justify-center gap-2 py-10 cursor-pointer";
-    tile.innerHTML = "<span class='text-3xl leading-none'>+</span><span class='text-sm font-medium'>" + esc(t("vehicles_add")) + "</span>";
+    tile.className = "btn-square min-h-[250px] flex-col items-center justify-center border-dashed text-center shadow-none";
+    tile.innerHTML = "<span class='flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-2xl font-medium text-brand-700'>+</span><span class='text-sm font-semibold text-slate-700'>" + esc(t("vehicles_add")) + "</span>";
     tile.addEventListener("click", function () { openVehicleModal(null); });
     return tile;
   }
@@ -983,20 +991,20 @@ function buildAppointmentCard(a, t) {
 
 function buildRepairCard(r, t) {
   var card = document.createElement("div");
-  card.className = "rounded-xl border border-slate-200 bg-white p-4";
+  card.className = "rounded-xl border border-slate-200 bg-white p-5 shadow-sm";
 
   var top = document.createElement("div");
-  top.className = "flex flex-wrap items-center justify-between gap-2";
+  top.className = "flex flex-wrap items-start justify-between gap-3";
   var left = document.createElement("div");
   left.className = "min-w-0";
   var sym = (r.price_rows && r.price_rows.length) ? currencySymbol(r.price_rows[0].currency || "CRC") : "₡";
   left.innerHTML =
     "<div class='flex flex-wrap items-center gap-2'>" +
-      "<span class='font-medium text-slate-800'>" + htmlEscape(r.title || "—") + "</span>" +
-      "<span class='badge badge-completed'>" + htmlEscape(sym + " " + formatMoney(r.total)) + "</span>" +
+      "<span class='text-base font-bold text-slate-900'>" + htmlEscape(r.title || "—") + "</span>" +
+      "<span class='badge badge-completed font-semibold'>" + htmlEscape(sym + " " + formatMoney(r.total)) + "</span>" +
     "</div>";
   var metaTags = document.createElement("div");
-  metaTags.className = "flex flex-wrap justify-center gap-2 mt-2";
+  metaTags.className = "mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2";
   metaTags.appendChild(buildInfoTag(t("field_date"), formatAppDate(String(r.created_at || "").slice(0, 10))));
   if (r.mileage != null) metaTags.appendChild(buildInfoTag(t("services_mileage"), r.mileage + " " + (r.mileage_unit || "km")));
   left.appendChild(metaTags);
@@ -1004,13 +1012,13 @@ function buildRepairCard(r, t) {
 
   var detailsBtn = document.createElement("button");
   detailsBtn.type = "button";
-  detailsBtn.className = "text-blue-600 hover:text-blue-800 underline text-sm font-medium";
+  detailsBtn.className = "btn-secondary min-h-9 px-3 py-1.5 text-sm";
   detailsBtn.textContent = t("repairs_view_details");
   top.appendChild(detailsBtn);
   card.appendChild(top);
 
   var details = document.createElement("div");
-  details.className = "hidden mt-4 pt-4 border-t border-slate-200 space-y-3";
+  details.className = "hidden mt-5 space-y-4 rounded-lg border-t border-slate-200 bg-slate-50 px-3 pt-4";
   card.appendChild(details);
 
   detailsBtn.addEventListener("click", function () {
@@ -1027,7 +1035,7 @@ function buildRepairCard(r, t) {
     mp.appendChild(mpLabel);
     var mpImg = document.createElement("img");
     mpImg.src = r.mileage_photo;
-    mpImg.className = "w-24 h-24 object-cover rounded-lg border border-slate-200 cursor-pointer";
+    mpImg.className = "h-32 w-32 cursor-pointer rounded-lg border border-slate-200 object-cover";
     mpImg.addEventListener("click", function () { viewPhoto(r.mileage_photo); });
     mp.appendChild(mpImg);
     details.appendChild(mp);
@@ -1191,6 +1199,19 @@ function initRepairs() {
     if (!v) { tagsBox.classList.add("hidden"); tagsBox.innerHTML = ""; return; }
     tagsBox.classList.remove("hidden");
     tagsBox.innerHTML = "";
+    var summary = document.createElement("div");
+    summary.className = "rounded-xl border border-slate-200 bg-white p-4 shadow-sm";
+    var summaryInner = document.createElement("div");
+    summaryInner.className = "flex flex-col gap-4 sm:flex-row sm:items-center";
+    if (v.front_photo) {
+      var vehiclePhoto = document.createElement("img");
+      vehiclePhoto.src = v.front_photo;
+      vehiclePhoto.alt = v.plate;
+      vehiclePhoto.className = "h-24 w-24 shrink-0 rounded-lg border border-slate-200 object-cover";
+      summaryInner.appendChild(vehiclePhoto);
+    }
+    var summaryInfo = document.createElement("div");
+    summaryInfo.className = "grid flex-1 grid-cols-1 gap-2 sm:grid-cols-2";
     var items = [
       { label: t("vehicles_plate"), value: v.plate },
       { label: t("vehicles_make"), value: v.make || "—" },
@@ -1199,11 +1220,14 @@ function initRepairs() {
       { label: t("vehicles_color"), value: v.color || "—" },
     ];
     items.forEach(function (it) {
-      var tag = document.createElement("span");
-      tag.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-white text-sm";
-      tag.innerHTML = "<span class='font-bold text-slate-800'>" + htmlEscape(it.label) + "</span> <span class='text-slate-600'>" + htmlEscape(it.value) + "</span>";
-      tagsBox.appendChild(tag);
+      var field = document.createElement("div");
+      field.className = "rounded-lg bg-slate-50 px-3 py-2";
+      field.innerHTML = "<div class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + htmlEscape(it.label) + "</div><div class='mt-0.5 text-sm font-semibold text-slate-900'>" + htmlEscape(it.value) + "</div>";
+      summaryInfo.appendChild(field);
     });
+    summaryInner.appendChild(summaryInfo);
+    summary.appendChild(summaryInner);
+    tagsBox.appendChild(summary);
   }
 
   function load() {

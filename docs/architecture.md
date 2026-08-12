@@ -46,6 +46,8 @@ connects through the internal hostname `db`.
 - SQLAlchemy 2.0 ORM + Pydantic v2 schemas.
 - Startup runs `Base.metadata.create_all()` to ensure tables exist.
 - Publish/subscribe event manager feeds a Server-Sent Events (SSE) stream.
+- Mechanic reminders are persisted in PostgreSQL and scoped to the authenticated
+  mechanic account; they are not stored in browser `localStorage`.
 
 ### Database (PostgreSQL)
 
@@ -136,6 +138,14 @@ and can **edit** their own vehicles with `PUT /api/auth/vehicles/{id}`
 - Otherwise the legacy **SMTP** fallback (`EMAIL_ADDRESS` / `EMAILAPP_PASSWORD`)
   is used.
 - If neither is configured, sending is skipped silently.
+
+### Mechanic dashboard reminders
+
+The mechanic `Inicio` view loads a weekly operational summary from the
+appointments and vehicles APIs. Manual reminders use the authenticated mechanic
+API and are stored in `mechanic_reminders`, keyed by `users.id`. The dashboard
+only displays pending reminders; marking one complete updates its persisted
+`is_completed` state.
 
 ### Internationalization (i18n)
 

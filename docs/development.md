@@ -30,7 +30,7 @@
 │       └── routers/
 │           ├── public.py        # Public endpoints (appointments, schedule, announcements, site settings)
 │           ├── client_auth.py   # Client register / login / refresh / me / vehicles / appointments / repairs
-│           ├── mechanic.py      # Panel auth, users, gmail, clients, appointments, settings, vehicles
+│           ├── mechanic.py      # Panel auth, users, reminders, gmail, clients, appointments, settings, vehicles
 │           ├── events.py        # SSE stream
 │           └── i18n_router.py   # Translation file endpoint
 │

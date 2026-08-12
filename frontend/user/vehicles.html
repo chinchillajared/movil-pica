@@ -6,8 +6,8 @@
     <title data-i18n="vehicles_title">My vehicles</title>
     <link rel="stylesheet" href="/shared/styles.css" />
   </head>
-  <body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
-    <header class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
+  <body class="app-shell flex flex-col">
+    <header class="app-header">
       <div class="flex items-center gap-3">
         <img data-site-logo alt="" class="hidden h-8 w-auto" />
         <a href="/user/garage.html" class="btn-secondary" data-i18n="btn_back">Back</a>
@@ -26,9 +26,12 @@
         <button id="btn-open-login" type="button" class="btn-primary" data-i18n="client_login">Sign in</button>
       </section>
 
-      <section id="vehicles-content" class="w-full max-w-3xl hidden">
-        <h1 class="text-2xl font-bold mb-6" data-i18n="vehicles_title">My vehicles</h1>
-        <div id="vehicles-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+      <section id="vehicles-content" class="hidden w-full max-w-4xl">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold text-slate-900" data-i18n="vehicles_title">My vehicles</h1>
+          <p class="mt-1 text-sm text-slate-500">Administra tus vehículos y consulta su historial de servicios.</p>
+        </div>
+        <div id="vehicles-grid" class="grid grid-cols-1 gap-4 md:grid-cols-2"></div>
       </section>
     </main>
 

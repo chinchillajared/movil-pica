@@ -202,6 +202,33 @@ class AnnouncementOut(BaseModel):
         from_attributes = True
 
 
+class ReminderCreate(BaseModel):
+    text: str = Field(..., min_length=1, max_length=120)
+
+    @field_validator("text")
+    @classmethod
+    def strip_text(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("text must not be empty")
+        return v
+
+
+class ReminderUpdate(BaseModel):
+    is_completed: bool
+
+
+class ReminderOut(BaseModel):
+    id: int
+    text: str
+    is_completed: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class CalendarDateInfo(BaseModel):
     date: str
     statuses: list[str]
@@ -296,7 +323,7 @@ class AppointmentTimeSettingsOut(BaseModel):
 class ClientRegister(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
-    email: str
+    email: Optional[str] = Field(default=None, max_length=255)
     phone: str = Field(..., min_length=4, max_length=20)
     country_code: str = Field(default="+506", max_length=10)
     password: str = Field(..., min_length=_PASSWORD_MIN, max_length=128)
@@ -311,7 +338,9 @@ class ClientRegister(BaseModel):
 
     @field_validator("email")
     @classmethod
-    def check_email(cls, v: str) -> str:
+    def check_email(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or not v.strip():
+            return None
         return _validate_email(v)
 
     @field_validator("phone")
@@ -323,20 +352,47 @@ class ClientRegister(BaseModel):
 
 
 class ClientLogin(BaseModel):
-    email: str
+    identifier: str = Field(..., min_length=3, max_length=255)
     password: str = Field(..., min_length=1, max_length=128)
+
+
+class ClientUpdate(BaseModel):
+    first_name: Optional[str] = Field(default=None, max_length=100)
+    last_name: Optional[str] = Field(default=None, max_length=100)
+    email: Optional[str] = Field(default=None, max_length=255)
+    phone: Optional[str] = Field(default=None, min_length=4, max_length=20)
+    country_code: Optional[str] = Field(default=None, max_length=10)
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def strip_optional(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        return v or None
 
     @field_validator("email")
     @classmethod
-    def check_email(cls, v: str) -> str:
+    def check_email(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or not v.strip():
+            return None
         return _validate_email(v)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if not _PHONE_RE.match(v):
+            raise ValueError("invalid phone format")
+        return v
 
 
 class ClientOut(BaseModel):
     id: int
     first_name: str
     last_name: str
-    email: str
+    email: Optional[str] = None
     phone: str
     country_code: str
     created_at: datetime
@@ -506,6 +562,23 @@ class GmailSettingsOut(BaseModel):
 class GmailAuthUrlOut(BaseModel):
     url: str
     state: str
+
+
+# --------------------------------------------------------------------------
+# WhatsApp integration (Kapso)
+# --------------------------------------------------------------------------
+class WhatsAppSettingsUpdate(BaseModel):
+    api_key: str = Field(..., min_length=1, max_length=255)
+    phone_number_id: str = Field(..., min_length=1, max_length=255)
+    test_phone: str = Field(default="", max_length=30)
+
+
+class WhatsAppSettingsOut(BaseModel):
+    configured: bool
+    activated: bool
+    phone_number_id: str
+    test_phone: str
+    updated_at: Optional[datetime] = None
 
 
 class EmailSend(BaseModel):

@@ -6,12 +6,16 @@
     <title data-i18n="mechanic_panel">Mechanic panel</title>
     <link rel="stylesheet" href="/shared/styles.css" />
   </head>
-  <body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
-    <header class="px-4 sm:px-6 py-4 border-b border-slate-200 bg-white">
+  <body class="app-shell flex flex-col">
+    <header class="app-header">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
+          <button id="sidebar-toggle" type="button" class="rounded-lg border border-slate-200 p-2 text-slate-600 lg:hidden" aria-label="Abrir menú">☰</button>
           <img data-site-logo alt="" class="hidden h-8 w-auto" />
-          <h1 class="text-xl font-bold text-slate-900" data-i18n="mechanic_panel">Mechanic panel</h1>
+          <div>
+            <h1 class="text-lg font-bold text-slate-900" data-i18n="mechanic_panel">Mechanic panel</h1>
+            <p class="hidden text-xs text-slate-500 sm:block">Gestión del taller</p>
+          </div>
           <button id="back-home-btn" type="button" class="btn-secondary hidden" data-i18n="btn_back">Volver</button>
         </div>
         <div class="flex items-center gap-2">
@@ -32,39 +36,87 @@
       </div>
     </header>
 
-    <main class="flex-1 p-4 sm:p-6 max-w-6xl w-full mx-auto flex flex-col items-center justify-start">
+    <div class="flex flex-1">
+      <aside id="app-sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full border-r border-slate-200 bg-white px-4 py-5 transition-transform lg:static lg:translate-x-0">
+        <div class="mb-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Menú principal</div>
+        <nav class="space-y-1">
+          <button id="sidebar-home" data-view="landing" class="sidebar-link active"><img src="/icons/book.svg" class="h-5 w-5" alt="" />Inicio</button>
+          <button id="sidebar-calendar" data-view="calendar" class="sidebar-link"><img src="/icons/calendar.svg" class="h-5 w-5" alt="" />Citas</button>
+          <button id="sidebar-vehicles" data-view="vehicles" class="sidebar-link"><img src="/icons/car.svg" class="h-5 w-5" alt="" />Vehículos</button>
+          <button id="sidebar-clients" data-view="clients" class="sidebar-link"><img src="/icons/person.svg" class="h-5 w-5" alt="" />Clientes</button>
+          <a href="/mechanic/create.html" class="sidebar-link"><img src="/icons/plus.svg" class="h-5 w-5" alt="" />Nueva cita</a>
+        </nav>
+        <div class="mb-2 mt-8 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Administración</div>
+        <nav class="space-y-1">
+          <button id="sidebar-announce" data-view="announce" class="sidebar-link"><img src="/icons/news_paper.svg" class="h-5 w-5" alt="" />Anuncios</button>
+          <button id="sidebar-users" data-view="users" class="sidebar-link hidden"><img src="/icons/pc.svg" class="h-5 w-5" alt="" />Usuarios</button>
+          <button id="sidebar-settings" data-view="settings" class="sidebar-link"><img src="/icons/gear.svg" class="h-5 w-5" alt="" />Configuración</button>
+        </nav>
+      </aside>
 
-      <!-- ===== LANDING (two big buttons) ===== -->
-      <div id="view-landing" class="grid grid-cols-1 sm:grid-cols-3 gap-8 w-full max-w-4xl justify-items-center">
-        <button id="landing-calendar" class="btn-square">
-          <img class="icon w-14 h-14" src="/icons/calendar.svg" alt="" />
-          <span class="text-lg" data-i18n="mechanic_view_calendar">Calendario de citas</span>
-        </button>
-        <button id="landing-vehicles" class="btn-square">
-          <img class="icon w-14 h-14" src="/icons/car.svg" alt="" />
-          <span class="text-lg" data-i18n="mechanic_view_vehicles">Vehicles</span>
-        </button>
-        <a href="/mechanic/create.html" class="btn-square">
-          <img class="icon w-14 h-14" src="/icons/plus.svg" alt="" />
-          <span class="text-lg" data-i18n="mechanic_create">New appointment</span>
-        </a>
-        <button id="landing-clients" class="btn-square">
-          <img class="icon w-14 h-14" src="/icons/clients.svg" alt="" />
-          <span class="text-lg" data-i18n="mechanic_view_clients">Clientes</span>
-        </button>
-        <button id="landing-announce" class="btn-square">
-          <img class="icon w-14 h-14" src="/icons/news_paper.svg" alt="" />
-          <span class="text-lg" data-i18n="mechanic_view_announcements">Anuncios</span>
-        </button>
-        <button id="landing-users" class="btn-square hidden">
-          <img class="icon w-14 h-14" src="/icons/pc.svg" alt="" />
-          <span class="text-lg" data-i18n="mechanic_view_users">Usuarios</span>
-        </button>
-        <button id="landing-settings" class="btn-square">
-          <img class="icon w-14 h-14" src="/icons/gear.svg" alt="" />
-          <span class="text-lg" data-i18n="mechanic_view_settings">Configuración</span>
-        </button>
-      </div>
+      <main class="flex-1 p-4 sm:p-6">
+        <div class="mx-auto flex w-full max-w-6xl flex-col items-center justify-start">
+
+      <div id="view-landing" class="w-full max-w-5xl">
+        <div class="mb-6">
+          <h2 class="text-2xl font-bold text-slate-900" data-i18n="home_title">Resumen del taller</h2>
+          <p class="mt-1 text-sm text-slate-500" data-i18n="home_subtitle">Información importante para organizar tu semana.</p>
+        </div>
+
+        <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p class="text-sm text-slate-500" data-i18n="home_week_appointments">Citas de esta semana</p>
+            <p id="home-week-count" class="mt-2 text-3xl font-bold text-slate-900">—</p>
+          </div>
+          <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+            <p class="text-sm text-amber-700" data-i18n="home_pending">Pendientes de confirmar</p>
+            <p id="home-pending-count" class="mt-2 text-3xl font-bold text-amber-900">—</p>
+          </div>
+          <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+            <p class="text-sm text-blue-700" data-i18n="home_next_appointment">Próxima cita</p>
+            <p id="home-next-date" class="mt-2 text-sm font-bold text-blue-950">—</p>
+            <p id="home-next-client" class="mt-1 truncate text-xs text-blue-800"></p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-5 lg:grid-cols-[1.35fr_1fr]">
+          <section class="card">
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <h3 class="text-lg font-bold text-slate-900" data-i18n="home_week_schedule">Agenda de esta semana</h3>
+              <button id="home-calendar-btn" type="button" class="btn-secondary text-sm" data-i18n="home_view_calendar">Ver calendario</button>
+            </div>
+            <div id="home-appointments" class="space-y-2"></div>
+            <p id="home-appointments-empty" class="hidden py-6 text-center text-sm text-slate-500" data-i18n="home_no_appointments">No hay citas esta semana.</p>
+          </section>
+
+          <section class="card">
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <h3 class="text-lg font-bold text-slate-900" data-i18n="home_reminders">Recordatorios importantes</h3>
+              <button id="home-add-reminder" type="button" class="rounded-lg border border-brand-600 bg-brand-600 px-2.5 py-1 text-lg leading-none text-white shadow-sm hover:bg-brand-700" aria-label="Agregar recordatorio">+</button>
+            </div>
+            <form id="home-reminder-form" class="mb-4 hidden gap-2">
+              <input id="home-reminder-input" class="field-input" maxlength="120" data-i18n-placeholder="home_reminder_placeholder" placeholder="Escribe un recordatorio" />
+              <button type="submit" class="btn-primary px-3" data-i18n="home_add">Agregar</button>
+            </form>
+            <div id="home-reminders" class="space-y-2"></div>
+            <p id="home-reminders-empty" class="py-4 text-center text-sm text-slate-500" data-i18n="home_no_reminders">No hay recordatorios pendientes.</p>
+          </section>
+        </div>
+
+        <div class="mt-5 flex flex-wrap gap-3">
+          <a href="/mechanic/create.html" class="btn-primary" data-i18n="mechanic_create">Nueva cita</a>
+          <button id="home-vehicles-btn" type="button" class="btn-secondary" data-i18n="mechanic_view_vehicles">Vehículos</button>
+        </div>
+
+        <div class="hidden">
+          <button id="landing-calendar" type="button"></button>
+          <button id="landing-vehicles" type="button"></button>
+          <button id="landing-clients" type="button"></button>
+          <button id="landing-announce" type="button"></button>
+          <button id="landing-users" type="button"></button>
+          <button id="landing-settings" type="button"></button>
+        </div>
+        </div>
 
       <!-- ===== CALENDAR VIEW ===== -->
       <div id="view-calendar" class="hidden w-full">
@@ -222,15 +274,17 @@
             <h3 class="text-lg font-semibold text-center mb-1" data-i18n="integrations_title">Integraciones</h3>
             <p class="text-slate-500 text-center text-sm mb-6" data-i18n="integrations_subtitle">Conecta tus servicios externos</p>
             <div class="grid sm:grid-cols-2 gap-4 max-w-xl mx-auto">
-              <div class="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-white">
-                <div class="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center shrink-0">
-                  <img src="/icons/whatsapp.svg" alt="" class="w-7 h-7" />
+              <div id="whatsapp-card" class="p-4 rounded-xl border border-slate-200 bg-white">
+                <div class="flex items-start gap-3">
+                  <div class="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center shrink-0">
+                    <img src="/icons/whatsapp.svg" alt="" class="w-7 h-7" />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-semibold" data-i18n="integrations_whatsapp">WhatsApp</div>
+                    <p class="text-sm text-slate-500" data-i18n="integrations_whatsapp_desc">Mensajería y notificaciones</p>
+                  </div>
                 </div>
-                <div class="flex-1 min-w-0">
-                  <div class="font-semibold" data-i18n="integrations_whatsapp">WhatsApp</div>
-                  <p class="text-sm text-slate-500" data-i18n="integrations_whatsapp_desc">Mensajería y notificaciones</p>
-                </div>
-                <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1 shrink-0" data-i18n="integrations_soon">Próximamente</span>
+                <div id="whatsapp-status" class="mt-4"></div>
               </div>
               <div id="gmail-card" class="p-4 rounded-xl border border-slate-200 bg-white">
                 <div class="flex items-start gap-3">
@@ -267,6 +321,24 @@
               </div>
             </div>
             <div id="gmail-msg" class="hidden max-w-xl mx-auto mt-4 rounded-lg border text-sm p-3"></div>
+            <div id="whatsapp-form" class="hidden max-w-xl mx-auto mt-4 p-5 rounded-xl border border-slate-200 bg-slate-50">
+              <div class="mb-3">
+                <label class="field-label" for="whatsapp-api-key" data-i18n="whatsapp_api_key">Kapso API Key</label>
+                <input id="whatsapp-api-key" type="password" class="field-input" autocomplete="off" placeholder="kapso_..." />
+              </div>
+              <div class="mb-3">
+                <label class="field-label" for="whatsapp-phone-number-id" data-i18n="whatsapp_phone_number_id">Phone Number ID</label>
+                <input id="whatsapp-phone-number-id" type="text" class="field-input" placeholder="123456789012345" />
+              </div>
+              <div class="mb-3">
+                <label class="field-label" for="whatsapp-test-phone" data-i18n="whatsapp_test_phone">Teléfono de prueba (con código de país)</label>
+                <input id="whatsapp-test-phone" type="tel" class="field-input" placeholder="+50688888888" />
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button id="whatsapp-save" type="button" class="btn-primary" data-i18n="whatsapp_save">Guardar y activar</button>
+              </div>
+            </div>
+            <div id="whatsapp-msg" class="hidden max-w-xl mx-auto mt-4 rounded-lg border text-sm p-3"></div>
           </div>
 
           <button id="settings-back-btn" type="button" class="btn-secondary mt-8" data-i18n="btn_back">Volver</button>
@@ -336,8 +408,9 @@
             <button id="vehicle-detail-back" type="button" class="btn-secondary" data-i18n="btn_back">Volver</button>
           </div>
         </section>
-      </div>
-    </main>
+        </div>
+      </main>
+    </div>
 
     <script src="/shared/i18n.js?v=5"></script>
     <script src="/shared/api.js?v=6"></script>

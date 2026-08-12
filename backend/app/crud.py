@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timedelta, timezone
+import re
 from typing import Optional
 
 from sqlalchemy import or_, select, desc, func
@@ -246,6 +247,50 @@ def delete_announcement(db: Session, obj: models.Announcement) -> None:
     db.commit()
 
 
+def list_reminders(db: Session, user_id: int) -> list[models.MechanicReminder]:
+    return (
+        db.query(models.MechanicReminder)
+        .filter(
+            models.MechanicReminder.user_id == user_id,
+            models.MechanicReminder.is_completed == False,
+        )
+        .order_by(models.MechanicReminder.created_at.asc())
+        .all()
+    )
+
+
+def create_reminder(
+    db: Session, user_id: int, data: schemas.ReminderCreate
+) -> models.MechanicReminder:
+    obj = models.MechanicReminder(user_id=user_id, text=data.text)
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+def get_reminder(
+    db: Session, reminder_id: int, user_id: int
+) -> Optional[models.MechanicReminder]:
+    return (
+        db.query(models.MechanicReminder)
+        .filter(
+            models.MechanicReminder.id == reminder_id,
+            models.MechanicReminder.user_id == user_id,
+        )
+        .first()
+    )
+
+
+def update_reminder(
+    db: Session, obj: models.MechanicReminder, data: schemas.ReminderUpdate
+) -> models.MechanicReminder:
+    obj.is_completed = data.is_completed
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
 def get_calendar_dates(
     db: Session, year: int, month: int
 ) -> list[dict]:
@@ -433,9 +478,35 @@ def update_site_settings(
 # Clients (public registered accounts)
 # --------------------------------------------------------------------------
 def get_client_by_email(db: Session, email: str) -> Optional[models.Client]:
+    email = (email or "").strip().lower()
+    if not email:
+        return None
     return db.execute(
-        select(models.Client).where(models.Client.email == email.strip().lower())
+        select(models.Client).where(models.Client.email == email)
     ).scalar_one_or_none()
+
+
+def _phone_digits(v: str) -> str:
+    return re.sub(r"\D", "", v or "")
+
+
+def get_client_by_phone(db: Session, phone: str) -> Optional[models.Client]:
+    digits = _phone_digits(phone)
+    if not digits:
+        return None
+    for c in db.execute(select(models.Client)).scalars():
+        if _phone_digits(c.phone) == digits:
+            return c
+    return None
+
+
+def get_client_by_identifier(db: Session, identifier: str) -> Optional[models.Client]:
+    identifier = (identifier or "").strip()
+    if not identifier:
+        return None
+    if "@" in identifier:
+        return get_client_by_email(db, identifier)
+    return get_client_by_phone(db, identifier)
 
 
 def get_client_by_id(db: Session, client_id: int) -> Optional[models.Client]:
@@ -458,10 +529,14 @@ def delete_client(db: Session, client_id: int) -> None:
 def create_client(
     db: Session, data: schemas.ClientRegister, password_hash: str
 ) -> models.Client:
+    if get_client_by_phone(db, data.phone):
+        raise ValueError("phone already registered")
+    if data.email and get_client_by_email(db, data.email):
+        raise ValueError("email already registered")
     obj = models.Client(
         first_name=data.first_name,
         last_name=data.last_name,
-        email=data.email.strip().lower(),
+        email=(data.email or "").strip().lower() or None,
         phone=data.phone,
         country_code=data.country_code,
         password_hash=password_hash,
@@ -474,6 +549,34 @@ def create_client(
         raise ValueError("email already registered")
     db.refresh(obj)
     return obj
+
+
+def update_client_profile(
+    db: Session,
+    client: models.Client,
+    data: schemas.ClientUpdate,
+) -> models.Client:
+    if data.first_name is not None:
+        client.first_name = data.first_name
+    if data.last_name is not None:
+        client.last_name = data.last_name
+    if data.country_code is not None:
+        client.country_code = data.country_code
+    if data.phone is not None:
+        other = get_client_by_phone(db, data.phone)
+        if other and other.id != client.id:
+            raise ValueError("phone already registered")
+        client.phone = data.phone
+    if data.email is not None:
+        email = data.email.strip().lower() or None
+        if email:
+            other = get_client_by_email(db, email)
+            if other and other.id != client.id:
+                raise ValueError("email already registered")
+        client.email = email
+    db.commit()
+    db.refresh(client)
+    return client
 
 
 def update_client_password(
@@ -621,6 +724,46 @@ def clear_gmail_integration(db: Session) -> models.GmailSettings:
     obj.activated = False
     obj.state = ""
     obj.state_expires = None
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+# --------------------------------------------------------------------------
+# WhatsApp settings (singleton id=1) via Kapso
+# --------------------------------------------------------------------------
+def get_whatsapp_settings(db: Session) -> models.WhatsAppSettings:
+    obj = db.get(models.WhatsAppSettings, 1)
+    if not obj:
+        obj = models.WhatsAppSettings(id=1)
+        db.add(obj)
+        db.commit()
+        db.refresh(obj)
+    return obj
+
+
+def save_whatsapp_settings(
+    db: Session,
+    api_key: str,
+    phone_number_id: str,
+    test_phone: str = "",
+) -> models.WhatsAppSettings:
+    obj = get_whatsapp_settings(db)
+    obj.api_key = api_key.strip()
+    obj.phone_number_id = phone_number_id.strip()
+    obj.test_phone = test_phone.strip()
+    obj.activated = bool(obj.api_key and obj.phone_number_id)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+def clear_whatsapp_integration(db: Session) -> models.WhatsAppSettings:
+    obj = get_whatsapp_settings(db)
+    obj.api_key = ""
+    obj.phone_number_id = ""
+    obj.test_phone = ""
+    obj.activated = False
     db.commit()
     db.refresh(obj)
     return obj

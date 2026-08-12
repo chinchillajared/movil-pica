@@ -6,8 +6,8 @@
     <title data-i18n="app_name">Mobile Mechanic</title>
     <link rel="stylesheet" href="/shared/styles.css" />
   </head>
-  <body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
-    <header class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
+  <body class="app-shell flex flex-col">
+    <header class="app-header">
       <div class="flex items-center gap-3">
         <img data-site-logo alt="" class="hidden h-10 w-auto" />
         <div>
@@ -23,16 +23,16 @@
     <div id="announcement-banner" class="hidden"></div>
 
     <main class="flex-1 flex items-center justify-center p-6">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-8 w-full max-w-4xl justify-items-center">
-        <a href="/user/schedule.html" class="btn-square">
+      <div class="grid w-full max-w-3xl grid-cols-1 gap-4 sm:grid-cols-3">
+        <a href="/user/schedule.html" class="btn-square sm:flex-col sm:items-start">
           <img class="icon w-14 h-14" src="/icons/calendar.svg" alt="" />
           <span class="text-lg" data-i18n="btn_schedule">Schedule an appointment</span>
         </a>
-        <a href="/user/status.html" class="btn-square">
+        <a href="/user/status.html" class="btn-square sm:flex-col sm:items-start">
           <img class="icon w-14 h-14" src="/icons/magnifying_glass.svg" alt="" />
           <span class="text-lg" data-i18n="btn_status">Check appointment status</span>
         </a>
-        <a href="/user/garage.html" class="btn-square">
+        <a href="/user/garage.html" class="btn-square sm:flex-col sm:items-start">
           <img class="icon w-14 h-14" src="/icons/garage.svg" alt="" />
           <span class="text-lg" data-i18n="btn_vehicles">My garage</span>
         </a>

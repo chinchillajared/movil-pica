@@ -60,6 +60,16 @@ tool is used).
 | `is_active`    | `BOOLEAN`     | Default `true`                          |
 | `created_at` / `updated_at` | `TIMESTAMPTZ` |                    |
 
+### `mechanic_reminders` — private mechanic reminders
+
+| Column                       | Type           | Notes |
+|-----------------------------|----------------|-------|
+| `id`                         | `INTEGER`      | Primary key |
+| `user_id`                    | `INTEGER`      | FK -> `users.id`, `ON DELETE CASCADE` |
+| `text`                       | `VARCHAR(120)` | Reminder text |
+| `is_completed`               | `BOOLEAN`      | Default `false`; completed items are hidden from `GET /reminders` |
+| `created_at` / `updated_at` | `TIMESTAMPTZ`  | Auto-managed timestamps |
+
 ### `vehicles` — canonical vehicle cards
 
 | Column        | Type          | Notes                                          |
@@ -133,7 +143,8 @@ clients ──< client_vehicles >── vehicles ──< service_records
 
 appointments   — independent records (email/phone used to match clients)
 announcements  — standalone
-users          — standalone
+users          — mechanic accounts
+users ──< mechanic_reminders
 ```
 
 - **`vehicles` ↔ `clients`:** many-to-many through `client_vehicles`. Deleting a
@@ -142,3 +153,5 @@ users          — standalone
 - **`appointments`:** no foreign keys — they are matched to a client by email or
   phone for the client's *Citas* list. Deleting a client does **not** delete
   their appointments.
+- **`mechanic_reminders`:** each reminder belongs to one mechanic account and is
+  deleted automatically when that account is deleted.
