@@ -97,9 +97,9 @@
     var rows = [
       { k: "label_first_name", v: c.first_name },
       { k: "label_last_name", v: c.last_name },
-      { k: "client_email", v: c.email },
       { k: "label_phone", v: (c.country_code || "+506") + " " + c.phone },
     ];
+    if (c.email) rows.push({ k: "client_email", v: c.email });
     rows.forEach(function (r) {
       var tag = document.createElement("span");
       tag.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 bg-white text-sm";
@@ -108,8 +108,70 @@
     });
     body.appendChild(tags);
 
+    var editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "btn-secondary w-full mt-4";
+    editBtn.textContent = t("client_edit");
+    editBtn.addEventListener("click", function () { buildAccountEditForm(body, c, overlay); });
+    body.appendChild(editBtn);
+
     overlay.querySelector("#account-modal-close").addEventListener("click", function () { overlay.remove(); });
     overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
+  }
+
+  function buildAccountEditForm(body, c, overlay) {
+    body.innerHTML = "";
+    var order = [];
+    order.push(field("edit-first", "text", "label_first_name", "placeholder_first_name", false));
+    order.push(field("edit-last", "text", "label_last_name", "placeholder_last_name", false));
+    order.push(field("edit-email", "email", "client_email", "client_email", false));
+    var hint = document.createElement("p");
+    hint.className = "text-xs text-slate-500 -mt-2 mb-3";
+    hint.textContent = t("client_email_hint");
+    order.push(hint);
+    order.push(field("edit-phone", "tel", "label_phone", "placeholder_phone", false));
+    order.forEach(function (el) { body.appendChild(el); });
+    document.getElementById("edit-first").value = c.first_name || "";
+    document.getElementById("edit-last").value = c.last_name || "";
+    document.getElementById("edit-email").value = c.email || "";
+    document.getElementById("edit-phone").value = c.phone || "";
+
+    var err = document.createElement("div");
+    err.id = "edit-error";
+    err.className = "hidden mb-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm p-3";
+    body.appendChild(err);
+
+    var saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "btn-primary w-full";
+    saveBtn.textContent = t("client_save");
+    saveBtn.addEventListener("click", function () {
+      saveBtn.disabled = true;
+      err.classList.add("hidden");
+      var payload = {
+        first_name: document.getElementById("edit-first").value.trim(),
+        last_name: document.getElementById("edit-last").value.trim(),
+        email: document.getElementById("edit-email").value.trim(),
+        phone: document.getElementById("edit-phone").value.trim(),
+      };
+      if (!payload.first_name || !payload.last_name || !payload.phone) {
+        saveBtn.disabled = false;
+        err.textContent = t("required_field");
+        err.classList.remove("hidden");
+        return;
+      }
+      window.API.auth.updateMe(payload).then(function (updated) {
+        setClientUser(updated);
+        overlay.remove();
+        render();
+        prefillForm();
+      }).catch(function (e) {
+        saveBtn.disabled = false;
+        err.textContent = e.message || t("error_generic");
+        err.classList.remove("hidden");
+      });
+    });
+    body.appendChild(saveBtn);
   }
 
   function render() {
@@ -174,10 +236,9 @@
       if (m === "register") {
         body.appendChild(field("auth-first", "text", "label_first_name", "placeholder_first_name", true));
         body.appendChild(field("auth-last", "text", "label_last_name", "placeholder_last_name", true));
-      }
-      body.appendChild(field("auth-email", "email", "client_email", "client_email", true));
-      if (m === "register") {
         body.appendChild(field("auth-phone", "tel", "label_phone", "placeholder_phone", true));
+      } else {
+        body.appendChild(field("auth-identifier", "text", "client_identifier", "client_identifier_ph", true));
       }
       body.appendChild(field("auth-pass", "password", "client_password", "client_password", true));
 
@@ -208,21 +269,25 @@
 
     function doSubmit(m, err) {
       err.classList.add("hidden");
-      var email = document.getElementById("auth-email").value.trim();
       var pass = document.getElementById("auth-pass").value;
-      if (!isValidEmail(email)) { showErr(err, t("client_invalid_email")); return; }
       if (m === "register") {
         var payload = {
           first_name: document.getElementById("auth-first").value.trim(),
           last_name: document.getElementById("auth-last").value.trim(),
-          email: email,
           phone: document.getElementById("auth-phone").value.trim(),
           country_code: "+506",
           password: pass,
         };
-        window.API.auth.register(payload).then(handleAuth).catch(function (e) { showErr(err, e.message || t("error_generic")); });
+        if (!payload.first_name || !payload.last_name || !payload.phone || !pass) { showErr(err, t("required_field")); return; }
+        window.API.auth.register(payload).then(handleAuth).catch(function (e) {
+          var detail = e.data && e.data.detail;
+          if (detail === "phone already registered") showErr(err, t("client_phone_exists"));
+          else showErr(err, e.message || t("error_generic"));
+        });
       } else {
-        window.API.auth.login({ email: email, password: pass }).then(handleAuth).catch(function (e) {
+        var identifier = document.getElementById("auth-identifier").value.trim();
+        if (!identifier || !pass) { showErr(err, t("required_field")); return; }
+        window.API.auth.login({ identifier: identifier, password: pass }).then(handleAuth).catch(function (e) {
           if (e.status === 401) {
             var detail = e.data && e.data.detail;
             showErr(err, detail === "client_not_registered" ? t("client_not_registered") : t("client_invalid_credentials"));

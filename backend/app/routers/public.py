@@ -44,6 +44,20 @@ def create_appointment(
         address=obj.address,
         client_email=obj.email,
     )
+    from ..whatsapp_sender import send_appointment_created_message
+
+    send_appointment_created_message(
+        db=db,
+        appointment_number=obj.appointment_number,
+        first_name=obj.first_name,
+        last_name=obj.last_name,
+        phone=obj.phone,
+        country_code=obj.country_code,
+        plate=obj.plate,
+        appointment_date=obj.appointment_date,
+        appointment_time=obj.appointment_time,
+        address=obj.address,
+    )
     event_manager.publish("appointment", {"type": "created", "number": obj.appointment_number})
     return schemas.AppointmentCreateResponse(
         appointment_number=obj.appointment_number, plate=obj.plate, status=obj.status

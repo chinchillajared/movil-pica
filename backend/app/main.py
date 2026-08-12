@@ -43,6 +43,9 @@ def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
     with engine.connect() as conn:
         conn.execute(
+            text("ALTER TABLE clients ALTER COLUMN email DROP NOT NULL")
+        )
+        conn.execute(
             text(
                 "ALTER TABLE appointments "
                 "ADD COLUMN IF NOT EXISTS plate VARCHAR(20) NOT NULL DEFAULT ''"

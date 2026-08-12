@@ -37,16 +37,22 @@ def _auth_response(client) -> schemas.ClientAuthResponse:
     dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60))],
 )
 def register(payload: schemas.ClientRegister, db: Session = Depends(get_db)):
-    if crud.get_client_by_email(db, payload.email):
+    if crud.get_client_by_phone(db, payload.phone):
+        raise HTTPException(status_code=409, detail="phone already registered")
+    if payload.email and crud.get_client_by_email(db, payload.email):
         raise HTTPException(status_code=409, detail="email already registered")
-    client = crud.create_client(db, payload, hash_password(payload.password))
-    html = f"""
-    <html><body style="font-family:sans-serif">
-      <h2 style="color:#1d4ed8">¡Bienvenido, {client.first_name}!</h2>
-      <p>Tu cuenta fue creada correctamente. Ya puedes agendar citas.</p>
-      <p style="color:#64748b">Welcome, {client.first_name}! Your account is ready.</p>
-    </body></html>"""
-    send_account_email(db, client.email, "Cuenta creada / Account created", html)
+    try:
+        client = crud.create_client(db, payload, hash_password(payload.password))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    if client.email:
+        html = f"""
+        <html><body style="font-family:sans-serif">
+          <h2 style="color:#1d4ed8">¡Bienvenido, {client.first_name}!</h2>
+          <p>Tu cuenta fue creada correctamente. Ya puedes agendar citas.</p>
+          <p style="color:#64748b">Welcome, {client.first_name}! Your account is ready.</p>
+        </body></html>"""
+        send_account_email(db, client.email, "Cuenta creada / Account created", html)
     return _auth_response(client)
 
 
@@ -56,7 +62,7 @@ def register(payload: schemas.ClientRegister, db: Session = Depends(get_db)):
     dependencies=[Depends(rate_limit(max_requests=10, window_seconds=60))],
 )
 def login(payload: schemas.ClientLogin, db: Session = Depends(get_db)):
-    client = crud.get_client_by_email(db, payload.email)
+    client = crud.get_client_by_identifier(db, payload.identifier)
     if not client:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -89,6 +95,19 @@ def refresh(payload: schemas.RefreshRequest, db: Session = Depends(get_db)):
 @router.get("/me", response_model=schemas.ClientOut)
 def me(client=Depends(require_client)):
     return schemas.ClientOut.model_validate(client)
+
+
+@router.put("/me", response_model=schemas.ClientOut)
+def update_me(
+    payload: schemas.ClientUpdate,
+    client=Depends(require_client),
+    db: Session = Depends(get_db),
+):
+    try:
+        updated = crud.update_client_profile(db, client, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return schemas.ClientOut.model_validate(updated)
 
 
 # --------------------------------------------------------------------------
