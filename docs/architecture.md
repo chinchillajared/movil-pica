@@ -88,6 +88,7 @@ bootstrap, and other sensitive endpoints. Configured via `RATE_LIMIT_MAX` and
   - `appointment` — created / updated (status, reservation) / deleted.
   - `vehicle` — vehicle or work-record changes.
   - `announcement` — announcements added/updated.
+  - `reminder` — mechanic dashboard reminder created/completed.
   - `settings` — schedule / site setting changes.
 - The client pages listen on `/api/events/stream` and refresh their data
   automatically (e.g. the client appointments list updates without a manual

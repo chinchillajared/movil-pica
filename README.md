@@ -35,7 +35,7 @@ client management, announcements, settings, and a Gmail email integration.
 - **Announcements banner** at the top of the site.
 - **Bilingual UI** (Spanish / English) — auto-detected from your browser, with a
   manual switcher in the header gear menu.
-- Optional email when booking (used for email notifications).
+- Booking requires the client's phone, plate and address; email is not requested.
 
 ### For the mechanic (panel)
 
@@ -114,7 +114,7 @@ password, and optionally upload a logo). That first account has the `admin` role
 
 1. Open the site root (`/`).
 2. **Agendar cita (Schedule):** pick a date, then a time, then enter your
-   details (first name, last name, phone, plate, optional email and address).
+   details (first name, last name, phone, plate and address).
    You'll get an appointment number (e.g. `APT-20260616-0001`).
 3. **Consultar cita (Status):** enter the phone and plate used when booking to
    see the appointment, edit it or cancel it.

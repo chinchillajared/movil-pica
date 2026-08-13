@@ -36,6 +36,7 @@ function todayISO() {
 
 var currentView = null;
 var calPollTimer = null;
+var mechanicEventSource = null;
 
 function startCalPoll() {
   stopCalPoll();
@@ -225,6 +226,25 @@ function initHomeDashboard() {
   if (calendar && !calendar.dataset.wired) { calendar.dataset.wired = "1"; calendar.addEventListener("click", function () { $("sidebar-calendar").click(); }); }
   var vehicles = $("home-vehicles-btn");
   if (vehicles && !vehicles.dataset.wired) { vehicles.dataset.wired = "1"; vehicles.addEventListener("click", function () { $("sidebar-vehicles").click(); }); }
+}
+
+function initMechanicLiveUpdates() {
+  if (mechanicEventSource) return;
+  mechanicEventSource = new EventSource("/api/events/stream");
+  mechanicEventSource.addEventListener("appointment", function () {
+    if (currentView === "landing") loadHomeDashboard();
+    if (currentView === "calendar") {
+      renderCal();
+      if (calSelectedDate) showCalDay(calSelectedDate);
+    }
+  });
+  mechanicEventSource.addEventListener("vehicle", function () {
+    if (currentView === "landing") loadHomeDashboard();
+    if (currentView === "vehicles") renderVehiclesList($("vehicles-search") ? $("vehicles-search").value.trim() : "");
+  });
+  mechanicEventSource.addEventListener("reminder", function () {
+    if (currentView === "landing") loadHomeReminders();
+  });
 }
 
 function flash(msg, isError) {
@@ -473,6 +493,55 @@ function buildTimeField(container, value, onChange) {
   });
   wrap.appendChild(ampm);
 
+  container.appendChild(wrap);
+}
+
+function buildScheduleTimeSelect(container, value, onChange) {
+  container.innerHTML = "";
+  var current = to12(value || "08:00");
+  var wrap = document.createElement("div");
+  wrap.className = "flex items-center gap-1.5";
+  var hourSelect = document.createElement("select");
+  var minuteSelect = document.createElement("input");
+  var ampmSelect = document.createElement("select");
+  [hourSelect, minuteSelect, ampmSelect].forEach(function (select) {
+    select.className = "field-input bg-white";
+  });
+  hourSelect.classList.add("w-[74px]");
+  minuteSelect.classList.add("w-[78px]");
+  minuteSelect.type = "text";
+  minuteSelect.inputMode = "numeric";
+  minuteSelect.maxLength = 2;
+  minuteSelect.value = current.minute;
+  minuteSelect.setAttribute("aria-label", t("settings_minute"));
+  ampmSelect.classList.add("w-[82px]");
+  for (var hour = 1; hour <= 12; hour++) {
+    var hourOption = document.createElement("option");
+    hourOption.value = hour;
+    hourOption.textContent = String(hour);
+    hourOption.selected = hour === current.hour;
+    hourSelect.appendChild(hourOption);
+  }
+  ["AM", "PM"].forEach(function (period) {
+    var periodOption = document.createElement("option");
+    periodOption.value = period;
+    periodOption.textContent = period;
+    periodOption.selected = period === current.ampm;
+    ampmSelect.appendChild(periodOption);
+  });
+  function commit() {
+    var minute = parseInt(minuteSelect.value, 10);
+    if (isNaN(minute)) minute = 0;
+    minute = Math.max(0, Math.min(59, minute));
+    minuteSelect.value = String(minute).padStart(2, "0");
+    onChange(from12(hourSelect.value, minuteSelect.value, ampmSelect.value));
+  }
+  hourSelect.addEventListener("change", commit);
+  minuteSelect.addEventListener("change", commit);
+  ampmSelect.addEventListener("change", commit);
+  wrap.appendChild(hourSelect);
+  wrap.appendChild(minuteSelect);
+  wrap.appendChild(ampmSelect);
   container.appendChild(wrap);
 }
 
@@ -1042,7 +1111,6 @@ function initCreatePage() {
         phone: phone,
         country_code: phoneCode,
         plate: plate,
-        email: $("email").value.trim() || null,
         address: $("address").value.trim(),
         appointment_date: selectedDate,
         appointment_time: selectedTime,
@@ -1149,11 +1217,9 @@ function initCreatePage() {
     var first = $("first_name");
     var last = $("last_name");
     var phoneInput = $("phone");
-    var email = $("email");
     if (first) first.value = client.first_name || "";
     if (last) last.value = client.last_name || "";
     if (phoneInput) phoneInput.value = client.phone || "";
-    if (email) email.value = client.email || "";
     phoneCode = client.country_code || "+506";
     var pcBtn = $("phone-code-btn");
     if (pcBtn) {
@@ -1239,7 +1305,7 @@ function initGearMenu() {
   if (logoutBtn) {
     logoutBtn.addEventListener("click", function () {
       clearMechanicSession();
-      window.location.href = "/mechanic/";
+      window.location.replace("/mechanic/");
     });
   }
 
@@ -1458,27 +1524,45 @@ function reservedPeriodText(a, apptTime) {
 
 function buildApptRow(a, apptTime) {
   var row = document.createElement("div");
-  row.className = "py-3 border-b border-slate-100";
+  row.className = "rounded-xl border border-slate-200 bg-white p-4 shadow-sm";
 
   var info = document.createElement("div");
-  info.className = "flex flex-wrap items-center justify-between gap-2 mb-3";
-  var tv = to12(a.appointment_time);
-  info.appendChild(tagsRow([
-    { label: t("cal_name"), value: a.first_name + " " + a.last_name },
-    { label: t("cal_time"), value: tv.hour + ":" + tv.minute + " " + tv.ampm },
-    { label: t("cal_plate"), value: a.plate },
-    { label: t("cal_number"), value: a.appointment_number },
-    { label: t("cal_address"), value: a.address || t("cal_no_location") },
-  ]));
+  info.className = "mb-4 flex items-center justify-between gap-3";
+  var heading = document.createElement("div");
+  heading.className = "min-w-0";
+  var name = document.createElement("p");
+  name.className = "truncate text-base font-bold text-slate-900";
+  name.textContent = [a.first_name, a.last_name].filter(Boolean).join(" ") || "—";
+  heading.appendChild(name);
+  var number = document.createElement("p");
+  number.className = "mt-0.5 text-xs text-slate-500";
+  number.textContent = a.appointment_number;
+  heading.appendChild(number);
+  info.appendChild(heading);
   var badge = document.createElement("span");
-  badge.className = "text-xs px-2 py-1 rounded-full " + statusBadgeClass(a.status);
+  badge.className = "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold " + statusBadgeClass(a.status);
   badge.textContent = statusLabel(a.status);
   info.appendChild(badge);
   row.appendChild(info);
+
+  var fields = document.createElement("div");
+  fields.className = "grid grid-cols-1 gap-2 sm:grid-cols-2";
+  var tv = to12(a.appointment_time);
+  [
+    { label: t("cal_time"), value: tv.hour + ":" + tv.minute + " " + tv.ampm },
+    { label: t("cal_plate"), value: a.plate },
+    { label: t("cal_address"), value: a.address || t("cal_no_location"), wide: true },
+  ].forEach(function (it) {
+    var field = document.createElement("div");
+    field.className = "rounded-lg bg-slate-50 px-3 py-2" + (it.wide ? " sm:col-span-2" : "");
+    field.innerHTML = "<div class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + escapeHTML(it.label) + "</div><div class='mt-1 break-words text-sm font-semibold text-slate-900'>" + escapeHTML(it.value) + "</div>";
+    fields.appendChild(field);
+  });
+  row.appendChild(fields);
   if (a.vehicle_id != null) {
     var viewLink = document.createElement("button");
     viewLink.type = "button";
-    viewLink.className = "cal-vehicle-link text-blue-600 hover:text-blue-800 underline text-xs font-medium mb-3";
+    viewLink.className = "cal-vehicle-link btn-secondary mt-3 text-sm";
     viewLink.dataset.vehicleId = a.vehicle_id;
     viewLink.textContent = t("cal_view_details");
     row.appendChild(viewLink);
@@ -1495,7 +1579,7 @@ function buildApptRow(a, apptTime) {
   }
 
   var actions = document.createElement("div");
-  actions.className = "flex flex-wrap items-center gap-2";
+  actions.className = "mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4";
 
   if (a.status === "pending") {
     actions.appendChild(rowBtn("Confirmar", "btn-secondary", function () {
@@ -1532,9 +1616,9 @@ function buildApptRow(a, apptTime) {
   row.appendChild(actions);
 
   var reserved = document.createElement("div");
-  reserved.className = "mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-2";
+  reserved.className = "mt-4 flex items-center justify-between gap-2 border-t border-slate-200 pt-4";
   var reservedInfo = document.createElement("div");
-  reservedInfo.className = "flex flex-wrap justify-center gap-2";
+  reservedInfo.className = "min-w-0 flex-1";
   reservedInfo.appendChild(buildInfoTag(t("cal_reserved"), reservedPeriodText(a, apptTime)));
   reserved.appendChild(reservedInfo);
   reserved.appendChild(rowBtn(t("cal_reserved_edit"), "btn-secondary", function () {
@@ -2304,33 +2388,42 @@ function renderVehiclesList(q) {
     }
     vehicles.forEach(function (v) {
       var row = document.createElement("div");
-      row.className = "rounded-xl border border-slate-200 p-4 bg-white cursor-pointer hover:shadow-sm flex items-center justify-between gap-3";
+      row.className = "group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-100 hover:shadow-md cursor-pointer";
       var left = document.createElement("div");
-      left.className = "flex items-center gap-3 min-w-0";
+      left.className = "flex min-w-0 items-start gap-4";
       if (v.front_photo) {
         var thumb = document.createElement("img");
         thumb.src = v.front_photo;
-        thumb.className = "w-12 h-12 rounded-lg object-cover border border-slate-200";
+        thumb.className = "h-16 w-16 shrink-0 rounded-lg border border-slate-200 object-cover";
         left.appendChild(thumb);
       }
       var info = document.createElement("div");
-      info.className = "min-w-0";
+      info.className = "min-w-0 flex-1";
+      var title = document.createElement("p");
+      title.className = "truncate text-base font-bold text-slate-900";
+      title.textContent = [v.make, v.model].filter(Boolean).join(" ") || "—";
+      info.appendChild(title);
       var plateEl = document.createElement("p");
-      plateEl.className = "font-medium text-slate-800";
+      plateEl.className = "mt-0.5 text-sm font-semibold uppercase tracking-wide text-brand-700";
       plateEl.textContent = v.plate;
       info.appendChild(plateEl);
-      var makeModel = [v.make, v.model].filter(Boolean).join(" ") || "—";
-      if (v.year) makeModel += " (" + v.year + ")";
-      var tagItems = [
-        { label: t("vehicles_model"), value: makeModel },
+      var meta = document.createElement("div");
+      meta.className = "mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2";
+      [
+        { label: t("vehicles_year"), value: v.year || "—" },
         { label: t("vehicles_services"), value: v.services_count },
-      ];
-      if (v.owners && v.owners.length) tagItems.push({ label: t("vehicles_owner"), value: ownersLabel(v.owners) });
-      info.appendChild(tagsRow(tagItems));
+        { label: t("vehicles_owner"), value: v.owners && v.owners.length ? ownersLabel(v.owners) : "—", wide: true },
+      ].forEach(function (it) {
+        var field = document.createElement("div");
+        field.className = "rounded-lg bg-slate-50 px-3 py-2" + (it.wide ? " sm:col-span-2" : "");
+        field.innerHTML = "<span class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + escapeHTML(it.label) + "</span><div class='mt-0.5 truncate font-semibold text-slate-800'>" + escapeHTML(String(it.value)) + "</div>";
+        meta.appendChild(field);
+      });
+      info.appendChild(meta);
       left.appendChild(info);
       row.appendChild(left);
       var arrow = document.createElement("span");
-      arrow.className = "text-slate-400";
+      arrow.className = "ml-2 text-lg text-slate-400 transition group-hover:text-brand-600";
       arrow.textContent = "→";
       row.appendChild(arrow);
       row.addEventListener("click", function () {
@@ -2430,26 +2523,24 @@ function renderHistoryPanel(panel, vehicle) {
   }
   records.forEach(function (r) {
     var item = document.createElement("div");
-    item.className = "rounded-xl border border-slate-200 p-4 bg-white cursor-pointer hover:shadow-sm flex items-center gap-3 mt-3";
+    item.className = "mt-3 grid cursor-pointer grid-cols-[auto_1fr_auto] items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-100 hover:shadow-md";
     var info = document.createElement("div");
     info.className = "min-w-0 flex-1";
     var title = document.createElement("p");
-    title.className = "font-medium text-slate-800";
+    title.className = "text-base font-bold text-slate-900";
     title.textContent = r.title || "—";
     info.appendChild(title);
-    var tagItems = [
-      { label: t("field_date"), value: formatLongDate(String(r.created_at || "").slice(0, 10)) },
-    ];
-    if (r.mileage != null && r.mileage !== "") {
-      tagItems.push({ label: t("services_mileage"), value: r.mileage + " " + (r.mileage_unit || "km") });
-    }
-    info.appendChild(tagsRow(tagItems));
     item.appendChild(r.mileage_photo
       ? thumbHTML(r.mileage_photo)
       : (function () { var sp = document.createElement("span"); sp.className = "w-12 h-12 shrink-0 rounded-lg border border-slate-200 bg-slate-50"; return sp; })());
+    var meta = document.createElement("div");
+    meta.className = "mt-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2";
+    meta.innerHTML = "<div class='rounded-lg bg-slate-50 px-3 py-2'><span class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + escapeHTML(t("field_date")) + "</span><div class='mt-0.5 font-semibold text-slate-800'>" + escapeHTML(formatLongDate(String(r.created_at || "").slice(0, 10))) + "</div></div>" +
+      (r.mileage != null && r.mileage !== "" ? "<div class='rounded-lg bg-slate-50 px-3 py-2'><span class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + escapeHTML(t("services_mileage")) + "</span><div class='mt-0.5 font-semibold text-slate-800'>" + escapeHTML(r.mileage + " " + (r.mileage_unit || "km")) + "</div></div>" : "");
+    info.appendChild(meta);
     item.appendChild(info);
     var total = document.createElement("span");
-    total.className = "text-sm font-semibold text-slate-700 whitespace-nowrap";
+    total.className = "badge badge-completed whitespace-nowrap font-semibold";
     var sym = (r.price_rows && r.price_rows.length) ? currencySymbol(r.price_rows[0].currency || "CRC") : "₡";
     total.textContent = t("services_total") + ": " + sym + " " + formatMoney(r.total);
     item.appendChild(total);
@@ -2618,25 +2709,31 @@ function openServiceDetail(recordId, vehicle) {
     }
     var r = state.record;
     var title = document.createElement("h3");
-    title.className = "text-lg font-bold text-slate-800 flex items-center gap-2 flex-wrap";
+    title.className = "text-xl font-bold text-slate-900";
     title.textContent = r.title || "—";
     header.appendChild(title);
     var meta = document.createElement("div");
-    meta.className = "mt-1";
-    var tagItems = [
+    meta.className = "mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2";
+    [
       { label: t("visits_date"), value: formatLongDate(String(r.created_at || "").slice(0, 10)) },
-    ];
-    if (r.mileage != null && r.mileage !== "") {
-      tagItems.push({ label: t("services_mileage"), value: String(r.mileage) + " " + (r.mileage_unit || "km") });
-    }
-    meta.appendChild(tagsRow(tagItems));
+      { label: t("services_mileage"), value: r.mileage != null && r.mileage !== "" ? String(r.mileage) + " " + (r.mileage_unit || "km") : "—" },
+    ].forEach(function (it) {
+      var field = document.createElement("div");
+      field.className = "rounded-lg bg-slate-50 px-3 py-2.5";
+      field.innerHTML = "<div class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + escapeHTML(it.label) + "</div><div class='mt-1 text-sm font-semibold text-slate-900'>" + escapeHTML(it.value) + "</div>";
+      meta.appendChild(field);
+    });
     header.appendChild(meta);
 
-    if (r.diagnosis) header.appendChild(sectionText(t("services_diagnosis"), r.diagnosis));
+    if (r.diagnosis) {
+      var diagnosis = sectionText(t("services_diagnosis"), r.diagnosis);
+      diagnosis.className = "mt-4 rounded-lg border border-slate-200 bg-white p-4";
+      header.appendChild(diagnosis);
+    }
 
     if (r.mileage_photo) {
       var ph = document.createElement("div");
-      ph.className = "mt-3";
+      ph.className = "mt-4 rounded-lg border border-slate-200 bg-white p-4";
       var pl = document.createElement("p");
       pl.className = "text-xs font-medium text-slate-500 mb-1";
       pl.textContent = t("services_mileage_photo");
@@ -2647,13 +2744,13 @@ function openServiceDetail(recordId, vehicle) {
 
     if (r.other_photos && r.other_photos.length) {
       var op = document.createElement("div");
-      op.className = "mt-3";
+      op.className = "mt-4 rounded-lg border border-slate-200 bg-white p-4";
       var opl = document.createElement("p");
       opl.className = "text-xs font-medium text-slate-500 mb-1";
       opl.textContent = t("services_other_photos");
       op.appendChild(opl);
       var og = document.createElement("div");
-      og.className = "flex flex-wrap gap-2";
+      og.className = "grid grid-cols-2 gap-2 sm:grid-cols-4";
       r.other_photos.forEach(function (src) {
         og.appendChild(photoThumb(src, function () { viewPhoto(src); }));
       });
@@ -2666,7 +2763,7 @@ function openServiceDetail(recordId, vehicle) {
     }
 
     var actions = document.createElement("div");
-    actions.className = "flex flex-wrap gap-2 mt-4 pt-3 border-t border-slate-100";
+    actions.className = "mt-5 flex flex-wrap gap-2 border-t border-slate-200 pt-4";
     actions.appendChild(smallBtn(t("services_edit_title"), "btn-secondary", function () {
       state.editing = true;
       render();
@@ -3386,11 +3483,11 @@ function buildDayRow(day, entry) {
   var timeRow = document.createElement("div");
   timeRow.className = "mt-3 flex flex-wrap items-end gap-3";
   row.appendChild(timeRow);
-  buildTimeField(timeField(timeRow, "settings_start_time"), entry.start_time, function (v) {
+  buildScheduleTimeSelect(timeField(timeRow, "settings_start_time"), entry.start_time, function (v) {
     entry.start_time = v;
     updateInvalid();
   });
-  buildTimeField(timeField(timeRow, "settings_end_time"), entry.end_time, function (v) {
+  buildScheduleTimeSelect(timeField(timeRow, "settings_end_time"), entry.end_time, function (v) {
     entry.end_time = v;
     updateInvalid();
   });
@@ -3415,11 +3512,11 @@ function buildDayRow(day, entry) {
     var lunchRow = document.createElement("div");
     lunchRow.className = "mt-2 flex flex-wrap items-end gap-3";
     row.appendChild(lunchRow);
-    buildTimeField(timeField(lunchRow, "settings_lunch_start"), entry.lunch_start, function (v) {
+    buildScheduleTimeSelect(timeField(lunchRow, "settings_lunch_start"), entry.lunch_start, function (v) {
       entry.lunch_start = v;
       updateInvalid();
     });
-    buildTimeField(timeField(lunchRow, "settings_lunch_end"), entry.lunch_end, function (v) {
+    buildScheduleTimeSelect(timeField(lunchRow, "settings_lunch_end"), entry.lunch_end, function (v) {
       entry.lunch_end = v;
       updateInvalid();
     });
@@ -4141,6 +4238,7 @@ function initDashboard() {
     handleGmailQuery();
     initGearMenu();
     attachLandingButtonListeners();
+    initMechanicLiveUpdates();
     initBackButtons();
     wireCalendarNav();
     restoreView();

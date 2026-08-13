@@ -50,7 +50,7 @@
       logout.addEventListener("click", function () {
         closeMenu();
         clearClientSession();
-        render();
+        window.location.reload();
       });
       menu.appendChild(logout);
     }
@@ -238,7 +238,7 @@
         body.appendChild(field("auth-last", "text", "label_last_name", "placeholder_last_name", true));
         body.appendChild(field("auth-phone", "tel", "label_phone", "placeholder_phone", true));
       } else {
-        body.appendChild(field("auth-identifier", "text", "client_identifier", "client_identifier_ph", true));
+        body.appendChild(field("auth-identifier", "tel", "client_identifier", "client_identifier_ph", true));
       }
       body.appendChild(field("auth-pass", "password", "client_password", "client_password", true));
 
@@ -318,8 +318,6 @@
       var el = document.getElementById(id);
       if (el && !el.value) el.value = map[id];
     });
-    var emailEl = document.getElementById("email");
-    if (emailEl && !emailEl.value && c.email) emailEl.value = c.email;
   }
 
   function tryRefresh() {

@@ -222,6 +222,7 @@ def create_reminder(
     db: Session = Depends(get_db),
 ):
     reminder = crud.create_reminder(db, user.id, payload)
+    event_manager.publish("reminder", {"type": "created"})
     return schemas.ReminderOut.model_validate(reminder)
 
 
@@ -235,7 +236,9 @@ def update_reminder(
     reminder = crud.get_reminder(db, reminder_id, user.id)
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
-    return schemas.ReminderOut.model_validate(crud.update_reminder(db, reminder, payload))
+    result = crud.update_reminder(db, reminder, payload)
+    event_manager.publish("reminder", {"type": "updated"})
+    return schemas.ReminderOut.model_validate(result)
 
 
 @router.post("/users/{user_id}/reset-password", response_model=schemas.UserOut)

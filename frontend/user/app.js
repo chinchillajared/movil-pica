@@ -480,7 +480,6 @@ function initSchedule() {
       last_name: form.last_name.value.trim(),
       phone: form.phone.value.trim(),
       country_code: document.getElementById("phone-code-btn").getAttribute("data-value"),
-      email: (document.getElementById("email") ? document.getElementById("email").value.trim() : "") || undefined,
       plate: form.plate.value.trim().toUpperCase(),
       appointment_date: state.dateStr,
       appointment_time: state.hour,
@@ -615,11 +614,15 @@ function initStatus() {
       { label: t("field_address"), value: a.address || "—" },
     ];
     items.forEach(function (it) {
-      tagsBox.appendChild(buildInfoTag(it.label, it.value));
+      var field = document.createElement("div");
+      field.className = "rounded-lg bg-slate-50 px-3 py-2.5";
+      field.innerHTML = "<div class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + htmlEscape(it.label) + "</div><div class='mt-1 break-words text-sm font-semibold text-slate-900'>" + htmlEscape(it.value) + "</div>";
+      if (it.label === t("field_address")) field.className += " sm:col-span-2";
+      tagsBox.appendChild(field);
     });
-    var statusTag = document.createElement("span");
-    statusTag.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 bg-white text-sm";
-    statusTag.innerHTML = "<span class='font-bold text-slate-800'>" + htmlEscape(t("field_status")) + "</span> <span class='badge " + statusBadgeClass(a.status) + "'>" + htmlEscape(t(statusKey(a.status))) + "</span>";
+    var statusTag = document.createElement("div");
+    statusTag.className = "flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 sm:col-span-2";
+    statusTag.innerHTML = "<span class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + htmlEscape(t("field_status")) + "</span><span class='badge " + statusBadgeClass(a.status) + "'>" + htmlEscape(t(statusKey(a.status))) + "</span>";
     tagsBox.appendChild(statusTag);
     currentAppt = a;
     updateActions(a);
@@ -1005,8 +1008,15 @@ function buildRepairCard(r, t) {
     "</div>";
   var metaTags = document.createElement("div");
   metaTags.className = "mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2";
-  metaTags.appendChild(buildInfoTag(t("field_date"), formatAppDate(String(r.created_at || "").slice(0, 10))));
-  if (r.mileage != null) metaTags.appendChild(buildInfoTag(t("services_mileage"), r.mileage + " " + (r.mileage_unit || "km")));
+  [
+    { label: t("field_date"), value: formatAppDate(String(r.created_at || "").slice(0, 10)) },
+    { label: t("services_mileage"), value: r.mileage != null ? r.mileage + " " + (r.mileage_unit || "km") : "—" },
+  ].forEach(function (it) {
+    var field = document.createElement("div");
+    field.className = "rounded-lg bg-slate-50 px-3 py-2";
+    field.innerHTML = "<span class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + htmlEscape(it.label) + "</span><div class='mt-0.5 font-semibold text-slate-800'>" + htmlEscape(String(it.value)) + "</div>";
+    metaTags.appendChild(field);
+  });
   left.appendChild(metaTags);
   top.appendChild(left);
 
@@ -1029,6 +1039,7 @@ function buildRepairCard(r, t) {
 
   if (r.mileage_photo) {
     var mp = document.createElement("div");
+    mp.className = "rounded-lg border border-slate-200 bg-white p-4";
     var mpLabel = document.createElement("p");
     mpLabel.className = "text-xs font-medium text-slate-500 mb-1";
     mpLabel.textContent = t("services_mileage_photo");
@@ -1041,7 +1052,11 @@ function buildRepairCard(r, t) {
     details.appendChild(mp);
   }
 
-  if (r.diagnosis) details.appendChild(sectionTextBlock(t("services_diagnosis"), r.diagnosis));
+  if (r.diagnosis) {
+    var diagnosis = sectionTextBlock(t("services_diagnosis"), r.diagnosis);
+    diagnosis.className = "rounded-lg border border-slate-200 bg-white p-4";
+    details.appendChild(diagnosis);
+  }
 
   if (r.price_rows && r.price_rows.length) {
     details.appendChild(buildServicePriceTable(r.price_rows, t));
@@ -1056,6 +1071,7 @@ function buildRepairCard(r, t) {
 
 function buildServicePriceTable(rows, t) {
   var wrap = document.createElement("div");
+  wrap.className = "overflow-hidden rounded-lg border border-slate-200 bg-white";
   var table = document.createElement("table");
   table.className = "w-full text-sm";
   var thead = document.createElement("thead");
@@ -1107,6 +1123,7 @@ function sectionTextBlock(label, text) {
 
 function photoStrip(label, sources) {
   var wrap = document.createElement("div");
+  wrap.className = "rounded-lg border border-slate-200 bg-white p-4";
   var h = document.createElement("p");
   h.className = "text-xs font-medium text-slate-500 mb-1";
   h.textContent = label;

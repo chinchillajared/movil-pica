@@ -127,7 +127,7 @@ are not returned by the list endpoint.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET    | `/api/events/stream` | Server-Sent Events stream. Events: `appointment`, `vehicle`, `announcement`, `settings` |
+| GET    | `/api/events/stream` | Server-Sent Events stream. Events: `appointment`, `vehicle`, `announcement`, `reminder`, `settings` |
 
 ## Notes
 
