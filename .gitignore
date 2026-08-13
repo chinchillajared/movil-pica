@@ -1,5 +1,7 @@
 .env
 AGENT.md
+lista_de_precios.txt
+plans.txt
 
 # Python
 __pycache__/

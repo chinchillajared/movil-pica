@@ -1,2 +1,0 @@
-
-* Para la pagina oficial mostrar precios de combustible y sistema de calculo por transporte al lugar de la cita.

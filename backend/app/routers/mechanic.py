@@ -402,6 +402,11 @@ def whatsapp_test(user: User = Depends(require_mechanic), db: Session = Depends(
             "Prueba de WhatsApp / WhatsApp test - Tu integracion funciona correctamente.",
         )
     except WhatsAppSendError as e:
+        if "active sandbox session required" in str(e).lower():
+            raise HTTPException(
+                status_code=400,
+                detail="Kapso sandbox requiere una sesión activa: el número de prueba debe iniciar primero una conversación con el número sandbox de Kapso.",
+            )
         raise HTTPException(status_code=400, detail=str(e))
     return {"ok": True}
 

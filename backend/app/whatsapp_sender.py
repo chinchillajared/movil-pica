@@ -82,7 +82,7 @@ def send_appointment_created_message(
     body = (
         f"Hola {first_name} {last_name}, tu cita fue creada correctamente.\n\n"
         f"Numero: {appointment_number}\n"
-        f"Placa: {plate}\n"
+        f"Número de placa: {plate}\n"
         f"Fecha: {appointment_date}\n"
         f"Hora: {_to_12h(appointment_time)}\n"
         f"Direccion: {address if address else 'Por confirmar'}\n\n"
@@ -112,7 +112,7 @@ def send_appointment_confirmed_message(
     body = (
         f"Hola {first_name} {last_name}, tu cita fue confirmada por nuestro mecanico.\n\n"
         f"Numero: {appointment_number}\n"
-        f"Placa: {plate}\n"
+        f"Número de placa: {plate}\n"
         f"Fecha: {appointment_date}\n"
         f"Hora: {_to_12h(appointment_time)}\n"
         f"Direccion: {address if address else 'Por confirmar'}\n\n"

@@ -423,6 +423,13 @@ function initSchedule() {
   var locStatus = document.getElementById("location-status");
   var addressInput = document.getElementById("address");
   var mapsLink = document.getElementById("maps-link");
+  var locationBaseClass = "btn-secondary w-full flex items-center justify-center gap-2 mt-2";
+
+  function setLocationButton(icon, label, disabled, success) {
+    locBtn.innerHTML = '<img class="w-5 h-5' + (disabled ? ' animate-spin' : '') + '" src="/icons/' + icon + '.svg" alt="" /> ' + label;
+    locBtn.disabled = disabled;
+    locBtn.className = locationBaseClass + (success ? " !border-green-500 !text-green-700" : "");
+  }
 
   function updateMapsLink() {
     if (addressInput.value.trim()) {
@@ -437,12 +444,11 @@ function initSchedule() {
 
   locBtn.addEventListener("click", function () {
     if (!navigator.geolocation) {
-      locStatus.textContent = "Geolocation not available";
+      locStatus.textContent = window.I18N.t("location_unavailable");
       locStatus.classList.remove("hidden");
       return;
     }
-    locBtn.disabled = true;
-    locBtn.innerHTML = '<img class="w-5 h-5 animate-spin" src="/icons/spinner.svg" alt="" /> Locating...';
+    setLocationButton("spinner", window.I18N.t("location_locating"), true, false);
     locStatus.classList.add("hidden");
 
     navigator.geolocation.getCurrentPosition(
@@ -450,17 +456,16 @@ function initSchedule() {
         var coords = pos.coords.latitude.toFixed(6) + "," + pos.coords.longitude.toFixed(6);
         addressInput.value = coords;
         updateMapsLink();
-        locBtn.innerHTML = '<img class="w-5 h-5" src="/icons/check.svg" alt="" /> Location shared';
-        locBtn.className = "btn-secondary w-full flex items-center justify-center gap-2 !border-green-500 !text-green-700";
+        setLocationButton("check", window.I18N.t("location_shared"), false, true);
         locStatus.textContent = coords;
         locStatus.className = "text-xs text-slate-500 mt-1 text-center font-mono";
       },
       function () {
-        locBtn.disabled = false;
-        locBtn.innerHTML = '<img class="w-5 h-5" src="/icons/location.svg" alt="" /> Share current location';
-        locStatus.textContent = "Could not get location. Try again.";
+        setLocationButton("location", window.I18N.t("btn_share_location"), false, false);
+        locStatus.textContent = window.I18N.t("location_error");
         locStatus.className = "text-xs text-red-600 mt-1 text-center";
-      }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   });
 
@@ -551,9 +556,8 @@ function initSchedule() {
         state.dateStr = a.appointment_date;
         state.hour = a.appointment_time.slice(0, 5);
         addressInput.value = a.address || "";
-        if (a.address && /^-?\d+\.\d+,-?\d+\.\d+$/.test(a.address)) {
-          locBtn.innerHTML = '<img class="w-5 h-5" src="/icons/check.svg" alt="" /> Location shared';
-          locBtn.className = "btn-secondary w-full flex items-center justify-center gap-2 !border-green-500 !text-green-700";
+        if (a.address && /^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(a.address)) {
+          setLocationButton("check", window.I18N.t("location_shared"), false, true);
           locStatus.textContent = a.address;
           locStatus.className = "text-xs text-slate-500 mt-1 text-center font-mono";
           updateMapsLink();
@@ -1004,7 +1008,7 @@ function buildRepairCard(r, t) {
   left.innerHTML =
     "<div class='flex flex-wrap items-center gap-2'>" +
       "<span class='text-base font-bold text-slate-900'>" + htmlEscape(r.title || "—") + "</span>" +
-      "<span class='badge badge-completed font-semibold'>" + htmlEscape(sym + " " + formatMoney(r.total)) + "</span>" +
+       "<span class='badge badge-completed font-semibold'>" + htmlEscape(t("services_total") + ": " + sym + " " + formatMoney(r.total)) + "</span>" +
     "</div>";
   var metaTags = document.createElement("div");
   metaTags.className = "mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2";
@@ -1027,46 +1031,39 @@ function buildRepairCard(r, t) {
   top.appendChild(detailsBtn);
   card.appendChild(top);
 
-  var details = document.createElement("div");
-  details.className = "hidden mt-5 space-y-4 rounded-lg border-t border-slate-200 bg-slate-50 px-3 pt-4";
-  card.appendChild(details);
-
   detailsBtn.addEventListener("click", function () {
-    var showing = !details.classList.contains("hidden");
-    details.classList.toggle("hidden", showing);
-    detailsBtn.textContent = showing ? t("repairs_view_details") : t("repairs_hide_details");
+    openRepairDetailModal(r, t);
   });
 
-  if (r.mileage_photo) {
-    var mp = document.createElement("div");
-    mp.className = "rounded-lg border border-slate-200 bg-white p-4";
-    var mpLabel = document.createElement("p");
-    mpLabel.className = "text-xs font-medium text-slate-500 mb-1";
-    mpLabel.textContent = t("services_mileage_photo");
-    mp.appendChild(mpLabel);
-    var mpImg = document.createElement("img");
-    mpImg.src = r.mileage_photo;
-    mpImg.className = "h-32 w-32 cursor-pointer rounded-lg border border-slate-200 object-cover";
-    mpImg.addEventListener("click", function () { viewPhoto(r.mileage_photo); });
-    mp.appendChild(mpImg);
-    details.appendChild(mp);
-  }
+  return card;
+}
+
+function openRepairDetailModal(r, t) {
+  var overlay = document.createElement("div");
+  overlay.className = "fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4";
+  var box = document.createElement("div");
+  box.className = "my-8 w-full max-w-xl rounded-2xl bg-white shadow-2xl";
+  box.innerHTML =
+    '<div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">' +
+      '<h3 class="text-lg font-bold text-slate-800"></h3>' +
+      '<button type="button" data-close class="text-2xl leading-none text-slate-400 hover:text-slate-700">&times;</button>' +
+    '</div>' +
+    '<div class="space-y-4 p-5" data-body></div>';
+  var body = box.querySelector("[data-body]");
+  var close = function () { overlay.remove(); };
+  overlay.appendChild(box);
+  box.querySelector("h3").textContent = r.title || "—";
+  box.querySelector("[data-close]").addEventListener("click", close);
+  overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
 
   if (r.diagnosis) {
     var diagnosis = sectionTextBlock(t("services_diagnosis"), r.diagnosis);
-    diagnosis.className = "rounded-lg border border-slate-200 bg-white p-4";
-    details.appendChild(diagnosis);
+    diagnosis.className = "rounded-lg border border-slate-200 bg-slate-50 p-4";
+    body.appendChild(diagnosis);
   }
-
-  if (r.price_rows && r.price_rows.length) {
-    details.appendChild(buildServicePriceTable(r.price_rows, t));
-  }
-
-  if (r.other_photos && r.other_photos.length) {
-    details.appendChild(photoStrip(t("services_other_photos"), r.other_photos));
-  }
-
-  return card;
+  if (r.price_rows && r.price_rows.length) body.appendChild(buildServicePriceTable(r.price_rows, t));
+  if (r.other_photos && r.other_photos.length) body.appendChild(photoStrip(t("services_other_photos"), r.other_photos));
+  document.body.appendChild(overlay);
 }
 
 function buildServicePriceTable(rows, t) {

@@ -779,3 +779,20 @@ class ServiceRecordOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ClientServiceRecordOut(BaseModel):
+    id: int
+    vehicle_id: int
+    title: str
+    diagnosis: str
+    mileage: Optional[int] = None
+    mileage_unit: str = "km"
+    other_photos: list[str] = Field(default_factory=list)
+    price_rows: list[ServicePriceRowOut] = Field(default_factory=list)
+    total: float = 0
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -3,7 +3,8 @@
 ## Quick start (development / local)
 
 ```bash
-# 1. Copy and edit the .env file first (see Configuration)
+cp .env.example .env
+# Edit .env and replace every placeholder before starting.
 # 2. Build and start all services:
 docker compose up -d --build
 ```
@@ -12,6 +13,7 @@ docker compose up -d --build
 |-------------|----------------------------------|
 | Client site | http://localhost:8081/           |
 | Mechanic    | http://localhost:8081/mechanic/  |
+| Backend API | http://localhost:8000/           |
 | pgAdmin     | http://localhost:8080/           |
 
 > The first build pulls images and runs `npm install` for Tailwind, so it may

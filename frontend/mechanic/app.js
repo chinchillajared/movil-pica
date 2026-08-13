@@ -1066,13 +1066,26 @@ function initCreatePage() {
 
   var shareBtn = $("share-location");
   if (shareBtn) {
+    var locationBaseClass = shareBtn.className;
+    function setLocationButton(icon, label, disabled, success) {
+      shareBtn.innerHTML = '<img class="w-5 h-5' + (disabled ? ' animate-spin' : '') + '" src="/icons/' + icon + '.svg" alt="" /> ' + label;
+      shareBtn.disabled = disabled;
+      shareBtn.className = locationBaseClass + (success ? " !border-green-500 !text-green-700" : "");
+    }
     shareBtn.addEventListener("click", function () {
       var locStatus = $("location-status");
-      if (!navigator.geolocation) return;
+      if (!navigator.geolocation) {
+        if (locStatus) {
+          locStatus.classList.remove("hidden");
+          locStatus.textContent = t("location_unavailable");
+        }
+        return;
+      }
       if (locStatus) {
         locStatus.classList.remove("hidden");
-        locStatus.textContent = "Obteniendo ubicación...";
+        locStatus.textContent = t("location_locating");
       }
+      setLocationButton("spinner", t("location_locating"), true, false);
       navigator.geolocation.getCurrentPosition(function (pos) {
         var lat = pos.coords.latitude;
         var lng = pos.coords.longitude;
@@ -1080,13 +1093,15 @@ function initCreatePage() {
         if (addr) addr.value = lat.toFixed(6) + ", " + lng.toFixed(6);
         var link = $("maps-link");
         if (link) {
-          link.href = "https://www.google.com/maps?q=" + lat + "," + lng;
+          link.href = "https://www.google.com/maps/search/?api=1&query=" + lat + "," + lng;
           link.classList.remove("hidden");
         }
-        if (locStatus) locStatus.textContent = "Ubicación obtenida";
+        setLocationButton("check", t("location_shared"), false, true);
+        if (locStatus) locStatus.textContent = lat.toFixed(6) + ", " + lng.toFixed(6);
       }, function () {
-        if (locStatus) locStatus.textContent = "No se pudo obtener la ubicación.";
-      });
+        setLocationButton("location", t("btn_share_location"), false, false);
+        if (locStatus) locStatus.textContent = t("location_error");
+      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
     });
   }
 
@@ -3051,21 +3066,37 @@ function priceRowsForm(state) {
   list.className = "space-y-2 mt-3";
 
   var btnsRow = document.createElement("div");
-  btnsRow.className = "flex flex-wrap items-center gap-2 mt-3";
+  btnsRow.className = "mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-brand-100 bg-brand-50 p-3";
   var addBtn = document.createElement("button");
   addBtn.type = "button";
-  addBtn.className = "btn-secondary !px-4 !py-2 text-sm";
+  addBtn.className = "btn-primary !px-4 !py-2 text-sm";
   addBtn.textContent = t("services_price_add");
   btnsRow.appendChild(addBtn);
 
+  var addHint = document.createElement("span");
+  addHint.className = "text-xs text-slate-600";
+  addHint.textContent = t("services_price_add_hint");
+  btnsRow.appendChild(addHint);
+
+  var otherSection = document.createElement("div");
+  otherSection.className = "mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3";
+  var otherTitle = document.createElement("p");
+  otherTitle.className = "text-sm font-semibold text-slate-700";
+  otherTitle.textContent = t("services_other_photos");
+  otherSection.appendChild(otherTitle);
+  var otherHint = document.createElement("p");
+  otherHint.className = "mt-1 text-xs text-slate-500";
+  otherHint.textContent = t("services_other_photos_hint");
+  otherSection.appendChild(otherHint);
+
   var otherBtn = document.createElement("button");
   otherBtn.type = "button";
-  otherBtn.className = "btn-secondary !px-4 !py-2 text-sm";
-  otherBtn.textContent = t("services_other_photos");
-  btnsRow.appendChild(otherBtn);
+  otherBtn.className = "btn-secondary mt-3 !px-4 !py-2 text-sm";
+  otherBtn.textContent = t("services_other_photos_add");
+  otherSection.appendChild(otherBtn);
 
   var otherBox = document.createElement("div");
-  otherBox.className = "flex flex-wrap gap-2 mt-2";
+  otherBox.className = "mt-3 flex flex-wrap gap-2";
   function renderOtherPhotos() {
     otherBox.innerHTML = "";
     (state.other_photos || []).forEach(function (src, i) {
@@ -3106,6 +3137,7 @@ function priceRowsForm(state) {
     });
     input.click();
   });
+  otherSection.appendChild(otherBox);
 
   function totals() {
     var labor = 0;
@@ -3142,6 +3174,19 @@ function priceRowsForm(state) {
     state.rows.forEach(function (row, idx) {
       var tr = document.createElement("div");
       tr.className = "rounded-xl border border-slate-200 p-3 bg-white";
+      var rowHeader = document.createElement("div");
+      rowHeader.className = "mb-2 flex items-center justify-between gap-2";
+      var rowTitle = document.createElement("p");
+      rowTitle.className = "text-sm font-semibold text-slate-800";
+      rowTitle.textContent = t("services_price_item") + " " + (idx + 1);
+      rowHeader.appendChild(rowTitle);
+      var rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "btn-danger !px-3 !py-1.5 text-xs";
+      rm.textContent = t("services_delete");
+      rm.addEventListener("click", function () { state.rows.splice(idx, 1); render(); });
+      rowHeader.appendChild(rm);
+      tr.appendChild(rowHeader);
       var typeBtns = document.createElement("div");
       typeBtns.className = "inline-flex rounded-lg bg-slate-100 p-1 mb-2";
       ["labor", "parts"].forEach(function (kind) {
@@ -3195,12 +3240,6 @@ function priceRowsForm(state) {
       amtBox.appendChild(amtLabel);
       amtBox.appendChild(amtWrap);
       fields.appendChild(amtBox);
-      var rm = document.createElement("button");
-      rm.type = "button";
-      rm.className = "btn-danger !px-3 !py-2 text-sm sm:col-span-2 justify-self-end";
-      rm.textContent = "×";
-      rm.addEventListener("click", function () { state.rows.splice(idx, 1); render(); });
-      fields.appendChild(rm);
       tr.appendChild(fields);
       list.appendChild(tr);
     });
@@ -3214,9 +3253,9 @@ function priceRowsForm(state) {
   var idle = "px-4 py-1.5 text-sm font-semibold rounded-md text-slate-600 hover:text-slate-800";
   curCrc.className = (state.currency || "CRC") === "CRC" ? active : idle;
   curUsd.className = (state.currency || "CRC") === "USD" ? active : idle;
-  wrap.appendChild(list);
   wrap.appendChild(btnsRow);
-  wrap.appendChild(otherBox);
+  wrap.appendChild(list);
+  wrap.appendChild(otherSection);
   render();
   return wrap;
 }
@@ -3848,6 +3887,11 @@ function initGmail() {
 
   var saveBtn = $("gmail-save-creds");
   if (saveBtn) saveBtn.onclick = saveGmailCreds;
+  var closeBtn = $("gmail-form-close");
+  if (closeBtn) closeBtn.onclick = function () {
+    var form = $("gmail-form");
+    if (form) form.classList.add("hidden");
+  };
   var authBtn = $("gmail-authorize");
   if (authBtn) authBtn.onclick = authorizeGmail;
 
@@ -3957,6 +4001,11 @@ function initWhatsapp() {
   whatsappLoaded = true;
   var saveBtn = $("whatsapp-save");
   if (saveBtn) saveBtn.onclick = saveWhatsapp;
+  var closeBtn = $("whatsapp-form-close");
+  if (closeBtn) closeBtn.onclick = function () {
+    var form = $("whatsapp-form");
+    if (form) form.classList.add("hidden");
+  };
   window.API.mechanic.getWhatsappSettings().then(renderWhatsapp).catch(function (err) {
     showErrorBox("whatsapp-msg", err.message || t("error_generic"));
   });
@@ -4217,8 +4266,28 @@ function initBackButtons() {
    ================================================================ */
 
 function restoreView() {
-  showView("landing");
-  initHomeDashboard();
+  var savedView = localStorage.getItem("mechanic_current_view") || "landing";
+  var view = $("view-" + savedView) ? savedView : "landing";
+  if (view === "vehicle-detail") {
+    var savedVehicle = Number(localStorage.getItem("mechanic_current_vehicle"));
+    if (!savedVehicle) view = "vehicles";
+    else {
+      currentVehicleId = savedVehicle;
+      vehicleDetailBackView = "vehicles";
+    }
+  }
+  showView(view);
+  if (view === "landing") initHomeDashboard();
+  if (view === "calendar") renderCal();
+  if (view === "announce") {
+    initAnnouncementForm();
+    loadAnnouncements();
+  }
+  if (view === "clients") loadClients();
+  if (view === "users") loadUsers();
+  if (view === "vehicles") renderVehiclesList();
+  if (view === "vehicle-detail") renderVehicleDetail(currentVehicleId);
+  if (view === "settings") initSettingsView();
 }
 
 function initDashboard() {

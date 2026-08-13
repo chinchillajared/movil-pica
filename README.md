@@ -86,7 +86,8 @@ client management, announcements, settings, and a Gmail email integration.
 ## Quick start
 
 ```bash
-# 1. Copy and edit the .env file first (see Configuration below)
+# 1. Create and edit .env first (see Configuration below)
+cp .env.example .env
 # 2. Build and start everything:
 docker compose up -d --build
 ```

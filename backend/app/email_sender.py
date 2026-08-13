@@ -197,7 +197,7 @@ def _build_appointment_html(appointment_number, first_name, last_name, phone, pl
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td width="50%" style="padding:8px 8px 8px 0;vertical-align:top;">
-                    <span style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.5px;">Placa / Plate</span>
+                    <span style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.5px;">Número de placa / Plate number</span>
                     <p style="margin:2px 0 0;color:#1e293b;font-size:15px;font-weight:600;">{plate}</p>
                   </td>
                   <td width="50%" style="padding:8px 0 8px 8px;vertical-align:top;">

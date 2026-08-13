@@ -132,7 +132,7 @@ def my_appointments(client=Depends(require_client), db: Session = Depends(get_db
 
 @router.get(
     "/repairs",
-    response_model=list[schemas.ServiceRecordOut],
+    response_model=list[schemas.ClientServiceRecordOut],
     dependencies=[Depends(rate_limit(max_requests=60, window_seconds=60))],
 )
 def my_repairs(client=Depends(require_client), db: Session = Depends(get_db)):
@@ -144,8 +144,8 @@ def my_repairs(client=Depends(require_client), db: Session = Depends(get_db)):
     ]
 
 
-def _service_record_out(record) -> schemas.ServiceRecordOut:
-    out = schemas.ServiceRecordOut.model_validate(record)
+def _service_record_out(record) -> schemas.ClientServiceRecordOut:
+    out = schemas.ClientServiceRecordOut.model_validate(record)
     total = 0.0
     for row in record.price_rows:
         if row.amount is not None:
