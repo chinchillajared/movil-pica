@@ -1584,6 +1584,10 @@ function showCalDay(dateStr) {
 
 function pad2(n) { return n < 10 ? "0" + n : "" + n; }
 
+function isCoordinates(v) {
+  return typeof v === "string" && /^\-?\d+(\.\d+)?\s*,\s*\-?\d+(\.\d+)?$/.test(v.trim());
+}
+
 function hourLabel12(h) {
   var h12 = h % 12 || 12;
   var ampm = h < 12 ? "AM" : (h >= 24 ? "AM" : "PM");
@@ -1647,23 +1651,22 @@ function buildApptRow(a, apptTime) {
   var tv = to12(a.appointment_time);
   [
     { label: t("cal_time"), value: tv.hour + ":" + tv.minute + " " + tv.ampm },
-    { label: t("cal_plate"), value: a.plate },
-    { label: t("cal_address"), value: a.address || t("cal_no_location"), wide: true },
+    { label: t("cal_plate"), value: a.plate, isPlate: true },
+    { label: t("cal_address"), value: a.address || t("cal_no_location"), isAddress: true, wide: true },
   ].forEach(function (it) {
     var field = document.createElement("div");
     field.className = "rounded-lg bg-slate-50 px-3 py-2" + (it.wide ? " sm:col-span-2" : "");
-    field.innerHTML = "<div class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + escapeHTML(it.label) + "</div><div class='mt-1 break-words text-sm font-semibold text-slate-900'>" + escapeHTML(it.value) + "</div>";
+    if (it.isPlate && a.vehicle_id != null) {
+      field.innerHTML = "<div class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + escapeHTML(it.label) + "</div><div class='mt-1 flex flex-wrap items-center gap-2'><span class='break-words text-sm font-semibold text-slate-900'>" + escapeHTML(it.value) + "</span><button type='button' class='cal-vehicle-link rounded-md bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700' data-vehicle-id='" + escapeHTML(a.vehicle_id) + "'></button></div>";
+      field.querySelector(".cal-vehicle-link").textContent = t("cal_view_details");
+    } else if (it.isAddress && isCoordinates(a.address)) {
+      field.innerHTML = "<div class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + escapeHTML(it.label) + "</div><div class='mt-1 flex flex-wrap items-center gap-2'><span class='break-words text-sm font-semibold text-slate-900'>" + escapeHTML(it.value) + "</span><a class='cal-location-link text-sm font-semibold text-brand-600 underline hover:text-brand-700' href='https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(a.address) + "' target='_blank' rel='noopener'>" + escapeHTML(t("btn_view_location")) + "</a></div>";
+    } else {
+      field.innerHTML = "<div class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + escapeHTML(it.label) + "</div><div class='mt-1 break-words text-sm font-semibold text-slate-900'>" + escapeHTML(it.value) + "</div>";
+    }
     fields.appendChild(field);
   });
   row.appendChild(fields);
-  if (a.vehicle_id != null) {
-    var viewLink = document.createElement("button");
-    viewLink.type = "button";
-    viewLink.className = "cal-vehicle-link btn-secondary mt-3 text-sm";
-    viewLink.dataset.vehicleId = a.vehicle_id;
-    viewLink.textContent = t("cal_view_details");
-    row.appendChild(viewLink);
-  }
 
   var viewLink = row.querySelector(".cal-vehicle-link");
   if (viewLink) {
