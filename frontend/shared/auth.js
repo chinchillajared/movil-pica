@@ -76,7 +76,60 @@
     host.appendChild(wrap);
   }
 
-  function openAccountModal() {
+  function buildAccountMenu(host) {
+    var wrap = document.createElement("div");
+    wrap.className = "relative";
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "client-header-action";
+    var icon = document.createElement("img");
+    icon.src = "/icons/person.svg";
+    icon.alt = "";
+    icon.className = "h-4 w-4 shrink-0";
+    var label = document.createElement("span");
+    label.textContent = t("account_nav");
+    btn.appendChild(icon);
+    btn.appendChild(label);
+
+    var menu = document.createElement("div");
+    menu.className = "hidden absolute right-0 top-full mt-1 bg-white rounded-xl border border-slate-200 shadow-lg py-1 min-w-[220px] z-50";
+
+    var items = [
+      { key: "nav_garage", href: "/user/vehicles.html" },
+      { key: "appointments_title", href: "/user/appointments.html" },
+      { key: "nav_schedule", href: "/user/schedule.html" },
+      { key: "account_info", href: "/user/account.html" },
+    ];
+    items.forEach(function (item) {
+      var link = document.createElement("a");
+      link.href = item.href;
+      link.className = "block w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-100";
+      link.textContent = t(item.key);
+      menu.appendChild(link);
+    });
+
+    function closeMenu() {
+      menu.classList.add("hidden");
+      document.removeEventListener("click", outside);
+    }
+    function outside(e) {
+      if (!wrap.contains(e.target)) closeMenu();
+    }
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var isHidden = menu.classList.contains("hidden");
+      menu.classList.toggle("hidden");
+      if (!isHidden) { document.removeEventListener("click", outside); return; }
+      setTimeout(function () { document.addEventListener("click", outside); }, 0);
+    });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    host.appendChild(wrap);
+  }
+
+  function openAccountModal(startEditing) {
     var c = currentClient();
     var overlay = document.createElement("div");
     overlay.className = "auth-modal-overlay";
@@ -89,31 +142,35 @@
         '<div id="account-modal-body" class="auth-modal-body"></div>' +
       '</div>';
     document.body.appendChild(overlay);
-    document.getElementById("account-modal-title").textContent = t("client_my_account");
+    document.getElementById("account-modal-title").textContent = startEditing ? t("client_edit") : t("client_my_account");
 
     var body = overlay.querySelector("#account-modal-body");
-    var tags = document.createElement("div");
-    tags.className = "flex flex-wrap justify-center gap-2";
-    var rows = [
-      { k: "label_first_name", v: c.first_name },
-      { k: "label_last_name", v: c.last_name },
-      { k: "label_phone", v: (c.country_code || "+506") + " " + c.phone },
-    ];
-    if (c.email) rows.push({ k: "client_email", v: c.email });
-    rows.forEach(function (r) {
-      var tag = document.createElement("span");
-      tag.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 bg-white text-sm";
-      tag.innerHTML = '<span class="font-bold text-slate-800">' + escapeHtml(t(r.k)) + '</span> <span class="text-slate-600">' + escapeHtml(r.v) + '</span>';
-      tags.appendChild(tag);
-    });
-    body.appendChild(tags);
+    if (startEditing) {
+      buildAccountEditForm(body, c, overlay);
+    } else {
+      var tags = document.createElement("div");
+      tags.className = "flex flex-wrap justify-center gap-2";
+      var rows = [
+        { k: "label_first_name", v: c.first_name },
+        { k: "label_last_name", v: c.last_name },
+        { k: "label_phone", v: (c.country_code || "+506") + " " + c.phone },
+      ];
+      if (c.email) rows.push({ k: "client_email", v: c.email });
+      rows.forEach(function (r) {
+        var tag = document.createElement("span");
+        tag.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-slate-200 bg-white text-sm";
+        tag.innerHTML = '<span class="font-bold text-slate-800">' + escapeHtml(t(r.k)) + '</span> <span class="text-slate-600">' + escapeHtml(r.v) + '</span>';
+        tags.appendChild(tag);
+      });
+      body.appendChild(tags);
 
-    var editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "btn-secondary w-full mt-4";
-    editBtn.textContent = t("client_edit");
-    editBtn.addEventListener("click", function () { buildAccountEditForm(body, c, overlay); });
-    body.appendChild(editBtn);
+      var editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "btn-secondary w-full mt-4";
+      editBtn.textContent = t("client_edit");
+      editBtn.addEventListener("click", function () { buildAccountEditForm(body, c, overlay); });
+      body.appendChild(editBtn);
+    }
 
     overlay.querySelector("#account-modal-close").addEventListener("click", function () { overlay.remove(); });
     overlay.addEventListener("click", function (e) { if (e.target === overlay) overlay.remove(); });
@@ -179,7 +236,7 @@
       host.innerHTML = "";
       var loggedIn = isLoggedIn();
       if (loggedIn) {
-        host.appendChild(buildHeaderAction("/user/account.html", "account_nav", "person.svg"));
+        buildAccountMenu(host);
       } else {
         var btn = document.createElement("button");
         btn.type = "button";
@@ -354,5 +411,5 @@
   }
 
   document.addEventListener("i18n:ready", render);
-  window.ClientAuth = { render: render, prefillForm: prefillForm, tryRefresh: tryRefresh, isLoggedIn: isLoggedIn, currentClient: currentClient, openLogin: function () { openModal("login"); } };
+  window.ClientAuth = { render: render, prefillForm: prefillForm, tryRefresh: tryRefresh, isLoggedIn: isLoggedIn, currentClient: currentClient, openLogin: function () { openModal("login"); }, openAccount: function () { openAccountModal(false); }, openAccountEdit: function () { openAccountModal(true); } };
 })();

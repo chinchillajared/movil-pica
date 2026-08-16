@@ -806,7 +806,7 @@ class ClientBrief(BaseModel):
     id: int
     first_name: str
     last_name: str
-    email: str
+    email: Optional[str] = None
 
     class Config:
         from_attributes = True

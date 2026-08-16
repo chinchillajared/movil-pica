@@ -1273,10 +1273,32 @@ function initAccount() {
   if (openLoginBtn && window.ClientAuth) {
     openLoginBtn.addEventListener("click", function () { window.ClientAuth.openLogin(); });
   }
+  var editBtn = $("btn-edit-account");
+  if (editBtn && window.ClientAuth && window.ClientAuth.openAccountEdit) {
+    editBtn.addEventListener("click", function () { window.ClientAuth.openAccountEdit(); });
+  }
   function showLoggedIn(state, client) {
     if (loginRequired) loginRequired.classList.toggle("hidden", state);
     if (content) content.classList.toggle("hidden", !state);
     if (name && client) name.textContent = client.first_name || "";
+    if (client) {
+      var first = $("account-info-first");
+      var last = $("account-info-last");
+      var phone = $("account-info-phone");
+      var emailRow = $("account-info-email-row");
+      var email = $("account-info-email");
+      if (first) first.textContent = client.first_name || "";
+      if (last) last.textContent = client.last_name || "";
+      if (phone) phone.textContent = (client.country_code || "+506") + " " + (client.phone || "");
+      if (emailRow && email) {
+        if (client.email) {
+          email.textContent = client.email;
+          emailRow.classList.remove("hidden");
+        } else {
+          emailRow.classList.add("hidden");
+        }
+      }
+    }
   }
   window.API.auth.me().then(function (client) {
     showLoggedIn(true, client);
