@@ -156,7 +156,10 @@ The public homepage consumes persisted `homepage_content` and
 opens the direct website editor, where service images are uploaded directly
 from the computer, along with their text, section visibility/order, and
 supported sizes. Image indexes are internal storage details and are not shown
-in the editor UI.
+in the editor UI. Every editor image-upload button uses `readFileAsDataURL`:
+images are re-encoded even when the source is under 500 KB, capped at 1600px
+on the largest dimension, and compressed toward the 500 KB target. Logo uploads
+can preserve transparency.
 
 ## Verifying changes
 

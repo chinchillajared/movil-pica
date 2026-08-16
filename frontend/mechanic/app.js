@@ -369,10 +369,6 @@ function readFileAsDataURL(file, preserveTransparency) {
     reader.onload = function () {
       var source = reader.result;
       var targetBytes = 500 * 1024;
-      if (file.size <= targetBytes) {
-        resolve(source);
-        return;
-      }
       var image = new Image();
       image.onload = function () {
         var width = image.naturalWidth || image.width;
