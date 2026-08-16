@@ -49,8 +49,8 @@
     │   ├── i18n.js              # Client-side translation engine
     │   └── styles.css           # Built Tailwind output
     ├── user/                    # User-facing pages
-    │   ├── index.html           # Home (schedule / status / my garage)
-    │   ├── garage.html          # Mi garaje hub (Citas / Vehículos)
+     │   ├── index.html           # Home (schedule / status / my garage)
+     │   ├── account.html         # Authenticated client entry point
     │   ├── schedule.html        # 3-step appointment wizard
     │   ├── status.html          # Appointment lookup form + result card
     │   ├── vehicles.html        # My vehicles (register / edit / remove)
@@ -104,9 +104,66 @@ docker compose up -d        # start services
   `<img src="/icons/...">`. To change an icon, edit the SVG and rebuild the
   frontend container.
 
+## Visual system
+
+The current interface uses a restrained automotive visual language shared by the
+public site and the mechanic panel:
+
+| Token | Value | Use |
+|-------|-------|-----|
+| Navy | `#0b1628` | Public header, hero, mechanic navigation |
+| Navy blue | `#1c3558` | High-contrast controls on dark headers |
+| Lime | `#c7f36a` | Primary actions and highlights on dark surfaces |
+| Brand blue | `#1d4ed8` | Primary actions on light surfaces and focus accents |
+| Page background | `#f6f8fb` | Public page and application background |
+| Border | `#e2e8f0` | Cards, inputs, dividers and information tags |
+
+### Components
+
+- `.btn-primary` is the main action. Use it for booking, saving and continuing.
+  On dark hero or header surfaces it is intentionally overridden to lime with
+  navy text.
+- `.btn-secondary` is for navigation, cancel and secondary actions. It must keep
+  a visible border on both light and dark surfaces.
+- `.btn-danger` is reserved for destructive operations.
+- `.field-input` is the shared input/select style: white surface, slate border,
+  rounded corners and a visible blue focus ring.
+- `.card`, `.page-card`, `.booking-shell` and `.service-card` define white
+  surfaces with thin borders, rounded corners and restrained shadows.
+- Information values use rounded tags: bold label, regular value, white
+  background and a thin border. Escape dynamic labels and values before adding
+  them to the DOM.
+- Dark-header configuration buttons use a `#1c3558` background, a light border
+  and an inverted white gear icon so the control remains visible at a glance.
+
+### Public imagery and services
+
+Images are managed from the mechanic panel site settings and returned by
+`GET /api/site/settings` as `background_images`. The public homepage uses those
+images for its hero and service cards, with an icon fallback when no image has
+been uploaded. The same response includes `logo_data_url`, `logo_width` and
+`logo_height`. The public branding loader renders the logo over the navy
+`#0b1628` background and replaces white/transparent background pixels with that
+brand color. Logo dimensions are persisted in pixels and validated by the API
+(`logo_width`: 80–320; `logo_height`: 32–120).
+
+Homepage service cards do not display prices, while opening a service in the
+client service history shows its labor, parts, currency, amounts, and totals.
+Price rows remain available to the mechanic panel and persistence.
+
+The public homepage consumes persisted `homepage_content` and
+`homepage_layout` values when present. The mechanic `Personalizar sitio` tab
+opens the direct website editor, where service images are uploaded directly
+from the computer, along with their text, section visibility/order, and
+supported sizes. Image indexes are internal storage details and are not shown
+in the editor UI.
+
 ## Verifying changes
 
 - Rebuild Tailwind after any class changes: `npm run build` in `frontend/`.
 - Rebuild the Docker containers to see frontend or backend changes:
   `docker compose build && docker compose up -d`.
 - Check that i18n keys exist in both `es.json` and `en.json`.
+- When changing `site_settings`, update the SQLAlchemy model, Pydantic schemas,
+  startup `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` setup, CRUD functions, and
+  both public and mechanic site-settings responses.

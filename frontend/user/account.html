@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" data-locale-base="/locales">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="account_title">My account</title>
+    <link rel="stylesheet" href="/shared/styles.css" />
+  </head>
+  <body class="app-shell flex min-h-screen flex-col">
+    <header class="public-header">
+      <a href="/user/" data-history-back class="public-back-button btn-secondary" data-i18n="btn_back">Volver</a>
+      <nav class="public-nav" aria-label="Navegación principal">
+        <a href="/user/" data-i18n="nav_home">Inicio</a>
+        <a href="/user/schedule.html" data-i18n="nav_schedule">Agendar cita</a>
+        <a href="/user/vehicles.html" class="current" data-i18n="nav_garage">Mi garaje</a>
+      </nav>
+      <div data-auth-ui class="flex items-center gap-2"></div>
+    </header>
+
+    <div id="announcement-banner" class="hidden"></div>
+
+    <main class="public-main flex-1">
+      <section id="login-required" class="page-main flex items-center justify-center">
+        <div class="page-card w-full max-w-md text-center">
+          <p class="public-kicker" data-i18n="account_kicker">Tu espacio personal</p>
+          <h1 class="mt-2 text-2xl font-black text-[#0b1628]" data-i18n="garage_login_required">Inicia sesión para abrir tu garaje</h1>
+          <p class="mt-3 text-sm leading-6 text-slate-500" data-i18n="garage_login_hint">Inicia sesión o crea una cuenta para gestionar tus citas, vehículos y servicios.</p>
+          <button id="btn-open-login" type="button" class="btn-primary mt-6" data-i18n="client_login">Iniciar sesión</button>
+        </div>
+      </section>
+
+      <section id="account-content" class="page-main hidden">
+        <div class="account-wrap">
+          <div class="account-intro">
+            <div>
+              <p class="public-kicker text-[#c7f36a]" data-i18n="account_kicker">Tu espacio personal</p>
+              <h1 data-i18n="account_title">¿Qué necesitas hacer hoy?</h1>
+              <p><span data-i18n="account_welcome">Bienvenido</span>, <strong id="account-client-name"></strong>. <span data-i18n="account_subtitle">Elige una opción para continuar.</span></p>
+            </div>
+          </div>
+
+          <div class="account-choice-grid">
+            <a href="/user/schedule.html" class="account-choice">
+              <span class="account-choice-icon"><img src="/icons/calendar.svg" alt="" /></span>
+              <span class="account-choice-copy"><strong data-i18n="account_schedule_title">Agendar cita</strong><span data-i18n="account_schedule_copy">Elige una fecha y un horario disponible para tu vehículo.</span></span>
+              <span class="account-choice-arrow" aria-hidden="true">→</span>
+            </a>
+            <a href="/user/vehicles.html" class="account-choice account-choice-dark">
+              <span class="account-choice-icon"><img src="/icons/garage.svg" alt="" /></span>
+              <span class="account-choice-copy"><strong data-i18n="account_garage_title">Mi garaje</strong><span data-i18n="account_garage_copy">Consulta tus vehículos, citas y servicios realizados.</span></span>
+              <span class="account-choice-arrow" aria-hidden="true">→</span>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="public-footer text-center">&copy; <span data-site-year></span> <span data-site-name></span></footer>
+
+    <script src="/shared/i18n.js?v=5"></script>
+    <script src="/shared/api.js?v=6"></script>
+    <script src="/shared/auth.js?v=6"></script>
+    <script src="/user/app.js?v=5"></script>
+    <script>window.PAGE = "account";</script>
+  </body>
+</html>

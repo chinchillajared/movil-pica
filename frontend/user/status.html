@@ -6,22 +6,19 @@
     <title data-i18n="form_title_status">Check your appointment status</title>
     <link rel="stylesheet" href="/shared/styles.css" />
   </head>
-  <body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
-    <header class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
-      <div class="flex items-center gap-3">
-        <img data-site-logo alt="" class="hidden h-8 w-auto" />
-        <a href="/user/" class="btn-secondary" data-i18n="btn_back">Back</a>
-      </div>
-      <div class="flex items-center gap-2">
-        <div data-auth-ui class="flex items-center gap-2"></div>
-      </div>
+  <body class="min-h-screen bg-[#f6f8fb] text-slate-800 flex flex-col">
+    <header class="public-header">
+      <a href="/user/" data-history-back class="public-back-button btn-secondary" data-i18n="btn_back">Volver</a>
+      <nav class="public-nav"><a href="/user/" data-i18n="nav_home">Inicio</a><a href="/user/schedule.html" data-i18n="nav_schedule">Agendar cita</a><a href="/user/status.html" class="current" data-i18n="nav_status">Consultar estado</a></nav>
+      <div class="flex items-center gap-2"><div data-auth-ui class="flex items-center gap-2"></div></div>
     </header>
 
     <div id="announcement-banner" class="hidden"></div>
 
-    <main class="flex-1 p-6 flex items-start justify-center">
-      <section class="card w-full max-w-xl">
-        <h1 class="text-2xl font-bold mb-6" data-i18n="form_title_status">Check your appointment status</h1>
+    <main class="page-main">
+      <section class="page-wrap max-w-3xl">
+        <div class="page-heading"><div><p class="public-kicker" data-i18n="status_kicker">Seguimiento sencillo</p><h1 data-i18n="form_title_status">Consulta el estado de tu cita</h1><p data-i18n="form_subtitle_status">Ingresa tu teléfono y número de placa para consultar tu cita.</p></div><a href="/user/schedule.html" class="btn-primary" data-i18n="home_hero_cta">Agendar una cita</a></div>
+        <div class="page-card">
 
         <form id="status-form" class="flex flex-col gap-4">
           <div>
@@ -53,7 +50,7 @@
 
         <div id="result-card" class="hidden mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 class="mb-4 text-lg font-bold text-slate-900" data-i18n="found_title">Appointment details</h2>
-          <div id="r-tags" class="grid grid-cols-1 gap-3 sm:grid-cols-2"></div>
+          <div id="r-tags" class="flex flex-wrap justify-center gap-2"></div>
 
           <div id="status-actions" class="hidden flex flex-wrap gap-3 mt-6 pt-4 border-t border-slate-200">
             <button id="btn-cancel-appt" type="button" class="btn-secondary"></button>
@@ -64,8 +61,11 @@
         <div class="mt-6">
           <a href="/user/" class="btn-secondary" data-i18n="btn_back">Back</a>
         </div>
+        </div>
       </section>
     </main>
+
+    <footer class="public-footer text-center">&copy; <span data-site-year></span> <span data-site-name></span></footer>
 
     <script src="/shared/i18n.js?v=5"></script>
     <script src="/shared/api.js?v=6"></script>

@@ -15,7 +15,7 @@ create/update/delete data may be rate-limited per IP.
 | PATCH  | `/api/appointments/{number}/cancel` | Cancel an appointment |
 | GET    | `/api/schedule` | Current work schedule |
 | GET    | `/api/announcements/active` | Active announcement banner |
-| GET    | `/api/site/settings` | Site settings (e.g. `logo_data_url`) |
+| GET    | `/api/site/settings` | Site settings (`logo_data_url`, `logo_width`, `logo_height`, backgrounds and homepage content) |
 | GET    | `/api/health` | Health check |
 
 ## Client auth (`/api/auth`) — requires `Authorization: Bearer <token>`
@@ -106,7 +106,12 @@ are not returned by the list endpoint.
 | POST   | `/days-off` | Add a day off |
 | DELETE | `/days-off/{date}` | Remove a day off |
 | GET/PUT| `/appointment-time` | Get / update appointment time settings |
-| GET/PUT| `/settings/site` | Get / update site settings (uploaded logo) |
+| GET/PUT| `/settings/site` | Get / update site settings (logo, dimensions, backgrounds and homepage content) |
+
+`PUT /settings/site` accepts optional `logo_width` (`80–320`) and
+`logo_height` (`32–120`) values in pixels. Logo uploads use `logo_data_url`; the
+public site renders white/transparent logo background pixels as the navy brand
+color `#0b1628`.
 
 ### Vehicles & service history
 

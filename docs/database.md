@@ -130,7 +130,7 @@ Unique per `(client_id, vehicle_id)`.
 | `days_off`                     | Non-working dates (`day_off` unique) + optional `reason`  |
 | `appointment_time_settings`    | `unit` (`hours`/`days`) + `value` — how long each booking blocks availability |
 | `gmail_settings`               | Singleton (`id=1`): Gmail OAuth credentials, tokens, state |
-| `site_settings`                | Singleton (`id=1`): uploaded `logo_data_url` (base64)      |
+| `site_settings`                | Singleton (`id=1`): uploaded `logo_data_url` (base64), `logo_width` (default `160`) and `logo_height` (default `64`) |
 
 ## Relationships
 

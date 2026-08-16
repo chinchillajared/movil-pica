@@ -70,8 +70,7 @@ def bootstrap_setup(payload: schemas.AdminSetup, db: Session = Depends(get_db)):
         ),
         hash_password(payload.password),
     )
-    if payload.logo_data_url:
-        crud.update_site_settings(db, payload.logo_data_url)
+    crud.update_site_settings(db, payload.logo_data_url, payload.site_name, payload.site_title)
     return schemas.MechanicAuthResponse(
         token=create_access_token(str(user.id), AUDIENCE_MECHANIC),
         refresh_token=create_refresh_token(str(user.id), AUDIENCE_MECHANIC),
@@ -725,7 +724,20 @@ def get_appointment_time(db: Session = Depends(get_db)):
             dependencies=[Depends(require_mechanic)])
 def get_site_settings_mech(db: Session = Depends(get_db)):
     obj = crud.get_site_settings(db)
-    return schemas.SiteSettingsOut(logo_data_url=obj.logo_data_url)
+    return schemas.SiteSettingsOut(
+        site_name=obj.site_name,
+        site_title=obj.site_title,
+        site_tagline=obj.site_tagline,
+        background_images=crud.site_background_images(obj),
+        background_image_count=obj.background_image_count,
+        background_opacity=obj.background_opacity,
+        background_pages=crud.site_background_pages(obj),
+        homepage_content=crud.site_homepage_content(obj),
+        homepage_layout=crud.site_homepage_layout(obj),
+        logo_data_url=obj.logo_data_url,
+        logo_width=obj.logo_width,
+        logo_height=obj.logo_height,
+    )
 
 
 @router.put("/settings/site", response_model=schemas.SiteSettingsOut,
@@ -733,9 +745,36 @@ def get_site_settings_mech(db: Session = Depends(get_db)):
 def update_site_settings_mech(
     payload: schemas.SiteSettingsUpdate, db: Session = Depends(get_db)
 ):
-    obj = crud.update_site_settings(db, payload.logo_data_url or "")
+    obj = crud.update_site_settings(
+        db,
+        payload.logo_data_url,
+        payload.site_name,
+        payload.site_title,
+        payload.site_tagline,
+        payload.background_images,
+        payload.background_image_count,
+        payload.background_opacity,
+        payload.background_pages,
+        payload.homepage_content,
+        payload.homepage_layout,
+        payload.logo_width,
+        payload.logo_height,
+    )
     event_manager.publish("settings", {"type": "updated"})
-    return schemas.SiteSettingsOut(logo_data_url=obj.logo_data_url)
+    return schemas.SiteSettingsOut(
+        site_name=obj.site_name,
+        site_title=obj.site_title,
+        site_tagline=obj.site_tagline,
+        background_images=crud.site_background_images(obj),
+        background_image_count=obj.background_image_count,
+        background_opacity=obj.background_opacity,
+        background_pages=crud.site_background_pages(obj),
+        homepage_content=crud.site_homepage_content(obj),
+        homepage_layout=crud.site_homepage_layout(obj),
+        logo_data_url=obj.logo_data_url,
+        logo_width=obj.logo_width,
+        logo_height=obj.logo_height,
+    )
 
 
 @router.put("/appointment-time", dependencies=[Depends(require_mechanic)])

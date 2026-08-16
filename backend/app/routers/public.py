@@ -16,7 +16,20 @@ router = APIRouter(prefix="/api", tags=["public"])
 @router.get("/site/settings")
 def get_site_settings(db: Session = Depends(get_db)):
     obj = crud.get_site_settings(db)
-    return {"logo_data_url": obj.logo_data_url}
+    return {
+        "site_name": obj.site_name,
+        "site_title": obj.site_title,
+        "site_tagline": obj.site_tagline,
+        "background_images": crud.site_background_images(obj),
+        "background_image_count": obj.background_image_count,
+        "background_opacity": obj.background_opacity,
+        "background_pages": crud.site_background_pages(obj),
+        "homepage_content": crud.site_homepage_content(obj),
+        "homepage_layout": crud.site_homepage_layout(obj),
+        "logo_data_url": obj.logo_data_url,
+        "logo_width": obj.logo_width,
+        "logo_height": obj.logo_height,
+    }
 
 
 @router.post(

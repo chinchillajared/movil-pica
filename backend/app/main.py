@@ -9,6 +9,7 @@ from sqlalchemy import text
 from .config import settings
 from .crud import DEFAULT_WORK_SCHEDULE
 from .database import Base, engine
+from .homepage_defaults import DEFAULT_HOMEPAGE_CONTENT, DEFAULT_HOMEPAGE_LAYOUT
 from .routers import events, i18n_router, mechanic, public
 from .routers.client_auth import router as client_auth_router
 
@@ -152,9 +153,86 @@ def on_startup() -> None:
             text(
                 "CREATE TABLE IF NOT EXISTS site_settings ("
                 "id INTEGER PRIMARY KEY, "
-                "logo_data_url TEXT NOT NULL DEFAULT '', "
-                "updated_at TIMESTAMPTZ DEFAULT NOW()"
+                "site_name VARCHAR(200) NOT NULL DEFAULT '', "
+                "site_title VARCHAR(200) NOT NULL DEFAULT 'Mecánico móvil', "
+                "site_tagline VARCHAR(300) NOT NULL DEFAULT 'Diagnóstico, mantenimiento y reparacion automotriz', "
+                "background_images TEXT NOT NULL DEFAULT '[]', "
+                "background_image_count INTEGER NOT NULL DEFAULT 3, "
+                "background_opacity INTEGER NOT NULL DEFAULT 100, "
+                "background_pages TEXT NOT NULL DEFAULT '[\"home\"]', "
+                 "homepage_content TEXT NOT NULL DEFAULT '{}', "
+                 "homepage_layout TEXT NOT NULL DEFAULT '{}', "
+                 "logo_data_url TEXT NOT NULL DEFAULT '', "
+                 "logo_width INTEGER NOT NULL DEFAULT 160, "
+                 "logo_height INTEGER NOT NULL DEFAULT 64, "
+                 "updated_at TIMESTAMPTZ DEFAULT NOW()"
                 ")"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE site_settings "
+                "ADD COLUMN IF NOT EXISTS site_name VARCHAR(200) NOT NULL DEFAULT ''"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE site_settings "
+                "ADD COLUMN IF NOT EXISTS site_title VARCHAR(200) NOT NULL DEFAULT 'Mecánico móvil'"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE site_settings "
+                "ADD COLUMN IF NOT EXISTS site_tagline VARCHAR(300) NOT NULL DEFAULT 'Diagnóstico, mantenimiento y reparacion automotriz'"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE site_settings "
+                "ADD COLUMN IF NOT EXISTS background_images TEXT NOT NULL DEFAULT '[]'"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE site_settings "
+                "ADD COLUMN IF NOT EXISTS background_image_count INTEGER NOT NULL DEFAULT 3"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE site_settings "
+                "ADD COLUMN IF NOT EXISTS background_opacity INTEGER NOT NULL DEFAULT 100"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE site_settings "
+                "ADD COLUMN IF NOT EXISTS background_pages TEXT NOT NULL DEFAULT '[\"home\"]'"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE site_settings "
+                "ADD COLUMN IF NOT EXISTS homepage_content TEXT NOT NULL DEFAULT '{}'"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE site_settings "
+                "ADD COLUMN IF NOT EXISTS homepage_layout TEXT NOT NULL DEFAULT '{}'"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE site_settings "
+                "ADD COLUMN IF NOT EXISTS logo_width INTEGER NOT NULL DEFAULT 160"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE site_settings "
+                "ADD COLUMN IF NOT EXISTS logo_height INTEGER NOT NULL DEFAULT 64"
             )
         )
         conn.execute(
@@ -166,8 +244,30 @@ def on_startup() -> None:
         )
         conn.execute(
             text(
+                "UPDATE site_settings "
+                "SET homepage_content = :homepage_content "
+                "WHERE homepage_content IS NULL OR homepage_content IN ('', '{}')"
+            ),
+            {"homepage_content": json.dumps(DEFAULT_HOMEPAGE_CONTENT, ensure_ascii=False)},
+        )
+        conn.execute(
+            text(
+                "UPDATE site_settings "
+                "SET homepage_layout = :homepage_layout "
+                "WHERE homepage_layout IS NULL OR homepage_layout IN ('', '{}')"
+            ),
+            {"homepage_layout": json.dumps(DEFAULT_HOMEPAGE_LAYOUT)},
+        )
+        conn.execute(
+            text(
                 "ALTER TABLE vehicles "
                 "ADD COLUMN IF NOT EXISTS front_photo TEXT NOT NULL DEFAULT ''"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE vehicles "
+                "ADD COLUMN IF NOT EXISTS engine VARCHAR(100) NOT NULL DEFAULT ''"
             )
         )
         conn.execute(

@@ -6,21 +6,24 @@
     <title data-i18n="form_title_schedule">Schedule your appointment</title>
     <link rel="stylesheet" href="/shared/styles.css" />
   </head>
-  <body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
-    <header class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-slate-200 bg-white">
-      <div class="flex items-center gap-3">
-        <img data-site-logo alt="" class="hidden h-8 w-auto" />
-        <a href="/user/" class="btn-secondary" data-i18n="btn_back">Back</a>
-      </div>
-      <div class="flex items-center gap-2">
-        <div data-auth-ui class="flex items-center gap-2"></div>
-      </div>
+  <body class="min-h-screen bg-[#f6f8fb] text-slate-800 flex flex-col">
+    <header class="public-header">
+      <a href="/user/" data-history-back class="public-back-button btn-secondary" data-i18n="btn_back">Volver</a>
+      <nav class="public-nav"><a href="/user/" data-i18n="nav_home">Inicio</a><a href="/user/schedule.html" class="current" data-i18n="nav_schedule">Agendar cita</a><a href="/user/status.html" data-i18n="nav_status">Consultar estado</a></nav>
+      <div class="flex items-center gap-2"><div data-auth-ui class="flex items-center gap-2"></div></div>
     </header>
 
     <div id="announcement-banner" class="hidden"></div>
 
-    <main class="flex-1 p-4 sm:p-6 flex items-start justify-center">
-      <section id="form-card" class="card w-full max-w-lg">
+    <main class="page-main">
+      <section class="booking-shell flex flex-col lg:flex-row">
+        <aside class="booking-aside">
+          <p class="public-kicker text-[#c7f36a]" data-i18n="booking_kicker">Reserva tu atención</p>
+          <h1 data-i18n="form_title_schedule">Agenda tu cita</h1>
+          <p data-i18n="booking_copy">Elige un horario disponible y cuéntanos dónde está tu vehículo. Te contactaremos para confirmar los detalles.</p>
+          <ul><li data-i18n="booking_item_one">Calendario actualizado</li><li data-i18n="booking_item_two">Horarios claros</li><li data-i18n="booking_item_three">Confirmación personalizada</li></ul>
+        </aside>
+        <div id="form-card" class="booking-form">
 
         <!-- Step indicator -->
         <div id="step-indicator" class="flex items-center justify-center gap-2 mb-6">
@@ -56,7 +59,7 @@
           <p id="step1-error" class="hidden text-sm text-red-600 mt-3 text-center"></p>
 
           <div class="flex justify-between mt-6">
-            <a href="/user/" class="btn-secondary" data-i18n="btn_back">Back</a>
+            <a href="/user/" data-history-back class="btn-secondary" data-i18n="btn_back">Back</a>
             <button id="step1-next" class="btn-primary" data-i18n="btn_next">Next</button>
           </div>
         </div>
@@ -158,8 +161,11 @@
           </div>
         </div>
 
+        </div>
       </section>
     </main>
+
+    <footer class="public-footer text-center">&copy; <span data-site-year></span> <span data-site-name></span></footer>
 
     <div id="loading-overlay" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
       <div class="bg-white rounded-2xl shadow-xl px-8 py-6 flex flex-col items-center gap-3">

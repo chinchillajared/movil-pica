@@ -1,7 +1,9 @@
 import re
 from datetime import date, time, datetime
-from typing import Optional
-from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Literal, Optional
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from .homepage_defaults import DEFAULT_HOMEPAGE_CONTENT, DEFAULT_HOMEPAGE_LAYOUT
 
 
 VALID_STATUSES = {"pending", "confirmed", "completed", "cancelled"}
@@ -511,6 +513,8 @@ class BootstrapStatus(BaseModel):
 
 class AdminSetup(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
+    site_name: str = Field(..., min_length=1, max_length=200)
+    site_title: str = Field(default="Mecánico móvil", min_length=1, max_length=200)
     email: str
     password: str = Field(..., min_length=_PASSWORD_MIN, max_length=128)
     logo_data_url: str = Field(default="", max_length=20000000)
@@ -520,13 +524,169 @@ class AdminSetup(BaseModel):
     def check_email(cls, v: str) -> str:
         return _validate_email(v)
 
+    @field_validator("site_name")
+    @classmethod
+    def check_site_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("site_name must not be empty")
+        return v
+
+
+class HomepageModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class HomepageHeroLocale(HomepageModel):
+    kicker: str = Field(..., min_length=1, max_length=200)
+    title: str = Field(..., min_length=1, max_length=200)
+    emphasis: str = Field(..., min_length=1, max_length=200)
+    copy_text: str = Field(..., alias="copy", min_length=1, max_length=1000)
+    primary_cta: str = Field(..., min_length=1, max_length=200)
+    secondary_cta: str = Field(..., min_length=1, max_length=200)
+    trust_1: str = Field(..., min_length=1, max_length=200)
+    trust_2: str = Field(..., min_length=1, max_length=200)
+    feature_kicker: str = Field(..., min_length=1, max_length=200)
+    feature_title: str = Field(..., min_length=1, max_length=300)
+    feature_copy: str = Field(..., min_length=1, max_length=1000)
+
+
+class HomepageHero(HomepageModel):
+    es: HomepageHeroLocale
+    en: HomepageHeroLocale
+
+
+class HomepageServicesLocale(HomepageModel):
+    kicker: str = Field(..., min_length=1, max_length=200)
+    title: str = Field(..., min_length=1, max_length=200)
+    copy_text: str = Field(..., alias="copy", min_length=1, max_length=1000)
+
+
+class HomepageServiceCardLocale(HomepageModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    copy_text: str = Field(..., alias="copy", min_length=1, max_length=1000)
+
+
+class HomepageServiceCard(HomepageModel):
+    es: HomepageServiceCardLocale
+    en: HomepageServiceCardLocale
+
+
+class HomepageServices(HomepageModel):
+    es: HomepageServicesLocale
+    en: HomepageServicesLocale
+    cards: list[HomepageServiceCard] = Field(..., min_length=4, max_length=4)
+
+
+class HomepageProcessStep(HomepageModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    copy_text: str = Field(..., alias="copy", min_length=1, max_length=1000)
+
+
+class HomepageProcessLocale(HomepageModel):
+    kicker: str = Field(..., min_length=1, max_length=200)
+    title: str = Field(..., min_length=1, max_length=300)
+    steps: list[HomepageProcessStep] = Field(..., min_length=3, max_length=3)
+
+
+class HomepageProcess(HomepageModel):
+    es: HomepageProcessLocale
+    en: HomepageProcessLocale
+
+
+class HomepageCtaLocale(HomepageModel):
+    title: str = Field(..., min_length=1, max_length=300)
+    copy_text: str = Field(..., alias="copy", min_length=1, max_length=1000)
+    button: str = Field(..., min_length=1, max_length=200)
+
+
+class HomepageCta(HomepageModel):
+    es: HomepageCtaLocale
+    en: HomepageCtaLocale
+
+
+class HomepageContent(HomepageModel):
+    hero: HomepageHero
+    services: HomepageServices
+    process: HomepageProcess
+    cta: HomepageCta
+
+
+HomepageSection = Literal["hero", "services", "process", "cta"]
+
+
+class HomepageImageIndices(HomepageModel):
+    hero: int = Field(..., ge=0, le=5)
+    services: list[int] = Field(..., min_length=4, max_length=4)
+
+    @field_validator("services")
+    @classmethod
+    def check_service_images(cls, v: list[int]) -> list[int]:
+        if any(index < 0 or index > 5 for index in v):
+            raise ValueError("image indices must be between 0 and 5")
+        return v
+
+
+class HomepageSizes(HomepageModel):
+    hero_min_height: int = Field(..., ge=320, le=1200)
+    section_padding: int = Field(..., ge=16, le=240)
+    service_card_image_height: int = Field(..., ge=80, le=500)
+    cta_padding: int = Field(..., ge=16, le=120)
+
+
+class HomepageLayout(HomepageModel):
+    section_order: list[HomepageSection] = Field(..., min_length=4, max_length=4)
+    section_visibility: dict[HomepageSection, bool]
+    image_indices: HomepageImageIndices
+    sizes: HomepageSizes
+
+    @field_validator("section_order")
+    @classmethod
+    def check_section_order(cls, v: list[HomepageSection]) -> list[HomepageSection]:
+        if len(set(v)) != 4:
+            raise ValueError("section_order must contain each homepage section once")
+        return v
+
 
 class SiteSettingsOut(BaseModel):
+    site_name: str = ""
+    site_title: str = "Mecánico móvil"
+    site_tagline: str = "Diagnóstico, mantenimiento y reparacion automotriz"
+    background_images: list[str] = Field(default_factory=list)
+    background_image_count: int = 3
+    background_opacity: int = 100
+    background_pages: list[str] = Field(default_factory=lambda: ["home"])
+    homepage_content: HomepageContent = Field(
+        default_factory=lambda: HomepageContent.model_validate(DEFAULT_HOMEPAGE_CONTENT)
+    )
+    homepage_layout: HomepageLayout = Field(
+        default_factory=lambda: HomepageLayout.model_validate(DEFAULT_HOMEPAGE_LAYOUT)
+    )
     logo_data_url: str = ""
+    logo_width: int = 160
+    logo_height: int = 64
 
 
 class SiteSettingsUpdate(BaseModel):
+    site_name: Optional[str] = Field(default=None, max_length=200)
+    site_title: Optional[str] = Field(default=None, max_length=200)
+    site_tagline: Optional[str] = Field(default=None, max_length=300)
+    background_images: Optional[list[str]] = None
+    background_image_count: Optional[int] = Field(default=None, ge=3, le=6)
+    background_opacity: Optional[int] = Field(default=None, ge=0, le=100)
+    background_pages: Optional[list[str]] = None
+    homepage_content: Optional[HomepageContent] = None
+    homepage_layout: Optional[HomepageLayout] = None
     logo_data_url: Optional[str] = Field(default=None, max_length=20000000)
+    logo_width: Optional[int] = Field(default=None, ge=80, le=320)
+    logo_height: Optional[int] = Field(default=None, ge=32, le=120)
+
+    @field_validator("background_images")
+    @classmethod
+    def check_background_images(cls, v: Optional[list[str]]) -> Optional[list[str]]:
+        if v and len(v) < 3:
+            raise ValueError("at least three background images are required")
+        return v
 
 
 class PasswordChange(BaseModel):
@@ -616,8 +776,8 @@ class VehicleBase(BaseModel):
     plate: str
     make: str = Field(default="", max_length=80)
     model: str = Field(default="", max_length=80)
+    engine: str = Field(default="", max_length=100)
     year: Optional[int] = Field(default=None, ge=1900, le=2200)
-    color: str = Field(default="", max_length=40)
     front_photo: str = Field(default="", max_length=20000000)
 
     @field_validator("plate")
@@ -630,8 +790,8 @@ class VehicleUpdate(BaseModel):
     plate: Optional[str] = None
     make: Optional[str] = None
     model: Optional[str] = None
+    engine: Optional[str] = None
     year: Optional[int] = None
-    color: Optional[str] = None
     front_photo: Optional[str] = None
 
     @field_validator("plate")
@@ -657,8 +817,8 @@ class VehicleSummaryOut(BaseModel):
     plate: str
     make: str
     model: str
+    engine: str
     year: Optional[int] = None
-    color: str
     front_photo: str = ""
     owners: list[ClientBrief] = Field(default_factory=list)
     services_count: int = 0
@@ -673,8 +833,8 @@ class VehicleOut(BaseModel):
     plate: str
     make: str
     model: str
+    engine: str
     year: Optional[int] = None
-    color: str
     owners: list[ClientBrief] = Field(default_factory=list)
     front_photo: str
     service_history: list["ServiceRecordOut"] = Field(default_factory=list)

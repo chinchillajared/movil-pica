@@ -1,4 +1,5 @@
 from datetime import date, datetime, time, timedelta, timezone
+import json
 import re
 from typing import Optional
 
@@ -7,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from . import models, schemas
+from .homepage_defaults import DEFAULT_HOMEPAGE_CONTENT, DEFAULT_HOMEPAGE_LAYOUT
 
 
 def _generate_number(db: Session, for_date: date) -> str:
@@ -456,7 +458,21 @@ def update_appointment_time_settings(
 def get_site_settings(db: Session) -> models.SiteSettings:
     obj = db.get(models.SiteSettings, 1)
     if not obj:
-        obj = models.SiteSettings(id=1, logo_data_url="")
+        obj = models.SiteSettings(
+            id=1,
+            site_name="",
+            site_title="Mecánico móvil",
+            site_tagline="Diagnóstico, mantenimiento y reparacion automotriz",
+            background_images="[]",
+            background_image_count=3,
+            background_opacity=100,
+            background_pages='["home"]',
+            homepage_content=json.dumps(DEFAULT_HOMEPAGE_CONTENT, ensure_ascii=False),
+            homepage_layout=json.dumps(DEFAULT_HOMEPAGE_LAYOUT),
+            logo_data_url="",
+            logo_width=160,
+            logo_height=64,
+        )
         db.add(obj)
         db.commit()
         db.refresh(obj)
@@ -464,14 +480,90 @@ def get_site_settings(db: Session) -> models.SiteSettings:
 
 
 def update_site_settings(
-    db: Session, logo_data_url: Optional[str] = None
+    db: Session,
+    logo_data_url: Optional[str] = None,
+    site_name: Optional[str] = None,
+    site_title: Optional[str] = None,
+    site_tagline: Optional[str] = None,
+    background_images: Optional[list[str]] = None,
+    background_image_count: Optional[int] = None,
+    background_opacity: Optional[int] = None,
+    background_pages: Optional[list[str]] = None,
+    homepage_content: Optional[schemas.HomepageContent] = None,
+    homepage_layout: Optional[schemas.HomepageLayout] = None,
+    logo_width: Optional[int] = None,
+    logo_height: Optional[int] = None,
 ) -> models.SiteSettings:
     obj = get_site_settings(db)
+    if site_name is not None:
+        obj.site_name = site_name.strip()
+    if site_title is not None:
+        obj.site_title = site_title.strip()
+    if site_tagline is not None:
+        obj.site_tagline = site_tagline.strip()
+    if background_images is not None:
+        obj.background_images = json.dumps(background_images)
+    if background_image_count is not None:
+        obj.background_image_count = background_image_count
+    if background_opacity is not None:
+        obj.background_opacity = background_opacity
+    if background_pages is not None:
+        obj.background_pages = json.dumps(background_pages)
+    if homepage_content is not None:
+        obj.homepage_content = json.dumps(
+            homepage_content.model_dump(mode="json", by_alias=True), ensure_ascii=False
+        )
+    if homepage_layout is not None:
+        obj.homepage_layout = json.dumps(homepage_layout.model_dump(mode="json", by_alias=True))
     if logo_data_url is not None:
         obj.logo_data_url = logo_data_url
+    if logo_width is not None:
+        obj.logo_width = logo_width
+    if logo_height is not None:
+        obj.logo_height = logo_height
     db.commit()
     db.refresh(obj)
     return obj
+
+
+def site_background_images(obj: models.SiteSettings) -> list[str]:
+    try:
+        value = json.loads(obj.background_images or "[]")
+        return value if isinstance(value, list) else []
+    except (TypeError, ValueError):
+        return []
+
+
+def site_background_pages(obj: models.SiteSettings) -> list[str]:
+    try:
+        value = json.loads(obj.background_pages or "[\"home\"]")
+        return value if isinstance(value, list) else ["home"]
+    except (TypeError, ValueError):
+        return ["home"]
+
+
+def site_homepage_content(obj: models.SiteSettings) -> dict:
+    try:
+        value = json.loads(obj.homepage_content or "")
+        return schemas.HomepageContent.model_validate(value).model_dump(
+            mode="json", by_alias=True
+        )
+    except (TypeError, ValueError):
+        return schemas.HomepageContent.model_validate(DEFAULT_HOMEPAGE_CONTENT).model_dump(
+            mode="json", by_alias=True
+        )
+
+
+def site_homepage_layout(obj: models.SiteSettings) -> dict:
+    try:
+        value = json.loads(obj.homepage_layout or "")
+        return schemas.HomepageLayout.model_validate(value).model_dump(
+            mode="json", by_alias=True
+        )
+    except (TypeError, ValueError):
+        return schemas.HomepageLayout.model_validate(DEFAULT_HOMEPAGE_LAYOUT).model_dump(
+            mode="json", by_alias=True
+        )
 
 
 # --------------------------------------------------------------------------
@@ -854,8 +946,8 @@ def create_vehicle(
         plate_key=schemas.normalize_plate_key(data.plate),
         make=data.make.strip(),
         model=data.model.strip(),
+        engine=data.engine.strip(),
         year=data.year,
-        color=data.color.strip(),
         front_photo=data.front_photo,
     )
     db.add(obj)
@@ -890,11 +982,11 @@ def create_or_link_client_vehicle(
     if data.model.strip() and not existing.model:
         existing.model = data.model.strip()
         changed = True
+    if data.engine.strip() and not existing.engine:
+        existing.engine = data.engine.strip()
+        changed = True
     if data.year and existing.year is None:
         existing.year = data.year
-        changed = True
-    if data.color.strip() and not existing.color:
-        existing.color = data.color.strip()
         changed = True
     if data.front_photo and not existing.front_photo:
         existing.front_photo = data.front_photo
@@ -954,8 +1046,8 @@ def update_vehicle(
         "plate": "plate",
         "make": "make",
         "model": "model",
+        "engine": "engine",
         "year": "year",
-        "color": "color",
         "front_photo": "front_photo",
     }
     for attr, field in fields.items():

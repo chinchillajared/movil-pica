@@ -245,8 +245,19 @@ class SiteSettings(Base):
     __tablename__ = "site_settings"
 
     id = Column(Integer, primary_key=True)
+    site_name = Column(String(200), nullable=False, server_default="")
+    site_title = Column(String(200), nullable=False, server_default="Mecánico móvil")
+    site_tagline = Column(String(300), nullable=False, server_default="Diagnóstico, mantenimiento y reparacion automotriz")
+    background_images = Column(Text, nullable=False, server_default="[]")
+    background_image_count = Column(Integer, nullable=False, server_default="3")
+    background_opacity = Column(Integer, nullable=False, server_default="100")
+    background_pages = Column(Text, nullable=False, server_default='["home"]')
+    homepage_content = Column(Text, nullable=False, server_default="{}")
+    homepage_layout = Column(Text, nullable=False, server_default="{}")
     # logo_data_url: "<data-url base64>" uploaded by the admin (empty = none)
     logo_data_url = Column(Text, nullable=False, server_default="")
+    logo_width = Column(Integer, nullable=False, server_default="160")
+    logo_height = Column(Integer, nullable=False, server_default="64")
     updated_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -265,8 +276,8 @@ class Vehicle(Base):
     plate_key = Column(String(20), nullable=False, unique=True, index=True, server_default="")
     make = Column(String(80), nullable=False, server_default="")
     model = Column(String(80), nullable=False, server_default="")
+    engine = Column(String(100), nullable=False, server_default="")
     year = Column(Integer, nullable=True)
-    color = Column(String(40), nullable=False, server_default="")
     # front_photo: single "<data-url base64>" for the front of the vehicle
     front_photo = Column(Text, nullable=False, server_default="")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

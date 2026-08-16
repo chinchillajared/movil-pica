@@ -37,6 +37,36 @@ function todayISO() {
 var currentView = null;
 var calPollTimer = null;
 var mechanicEventSource = null;
+var calRenderVersion = 0;
+var embeddedCreateLoaded = false;
+
+function initEmbeddedCreateView() {
+  if (embeddedCreateLoaded) return;
+  var mount = $("embedded-create-mount");
+  if (!mount) return;
+  embeddedCreateLoaded = true;
+  mount.innerHTML = '<div class="card py-10 text-center text-sm text-slate-500">' + escapeHTML(t("mechanic_loading")) + '</div>';
+  fetch("/mechanic/create.html", { cache: "no-cache" }).then(function (res) {
+    if (!res.ok) throw new Error("Could not load appointment form");
+    return res.text();
+  }).then(function (html) {
+    var doc = new DOMParser().parseFromString(html, "text/html");
+    var source = doc.querySelector("main");
+    if (!source) throw new Error("Appointment form is unavailable");
+    mount.innerHTML = source.innerHTML;
+    var back = mount.querySelector("a[href=\"/mechanic/dashboard.html\"]");
+    if (back) {
+      back.addEventListener("click", function (event) {
+        event.preventDefault();
+        showView("landing");
+      });
+    }
+    initCreatePage();
+  }).catch(function (err) {
+    embeddedCreateLoaded = false;
+    mount.innerHTML = '<div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">' + escapeHTML(err.message || t("error_generic")) + '</div>';
+  });
+}
 
 function startCalPoll() {
   stopCalPoll();
@@ -80,6 +110,7 @@ function showView(viewName) {
     }
     if (viewName === "calendar") startCalPoll();
     else stopCalPoll();
+    if (viewName === "create") initEmbeddedCreateView();
   }
   var backHome = $("back-home-btn");
   if (backHome) backHome.classList.toggle("hidden", viewName === "landing");
@@ -332,10 +363,61 @@ function closeModal() {
   if (o) o.remove();
 }
 
-function readFileAsDataURL(file) {
+function readFileAsDataURL(file, preserveTransparency) {
   return new Promise(function (resolve, reject) {
     var reader = new FileReader();
-    reader.onload = function () { resolve(reader.result); };
+    reader.onload = function () {
+      var source = reader.result;
+      var targetBytes = 500 * 1024;
+      if (file.size <= targetBytes) {
+        resolve(source);
+        return;
+      }
+      var image = new Image();
+      image.onload = function () {
+        var width = image.naturalWidth || image.width;
+        var height = image.naturalHeight || image.height;
+        var maxDimension = 1600;
+        if (Math.max(width, height) > maxDimension) {
+          var scale = maxDimension / Math.max(width, height);
+          width = Math.max(1, Math.round(width * scale));
+          height = Math.max(1, Math.round(height * scale));
+        }
+        var canvas = document.createElement("canvas");
+        var ctx = canvas.getContext("2d");
+        var result = "";
+        for (var attempt = 0; attempt < 8; attempt++) {
+          canvas.width = width;
+          canvas.height = height;
+          ctx.fillStyle = "#ffffff";
+          if (!preserveTransparency) ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(image, 0, 0, width, height);
+          if (preserveTransparency) {
+            result = canvas.toDataURL("image/png");
+            if (result.length * 0.75 <= targetBytes) {
+              resolve(result);
+              return;
+            }
+            width = Math.max(320, Math.round(width * 0.75));
+            height = Math.max(320, Math.round(height * 0.75));
+            continue;
+          }
+          for (var quality = 0.82; quality >= 0.18; quality -= 0.08) {
+            result = canvas.toDataURL("image/jpeg", quality);
+            if (result.length * 0.75 <= targetBytes) {
+              resolve(result);
+              return;
+            }
+          }
+          width = Math.max(320, Math.round(width * 0.75));
+          height = Math.max(320, Math.round(height * 0.75));
+        }
+        if (result && result.length * 0.75 <= targetBytes) resolve(result);
+        else reject(new Error("image too large after compression"));
+      };
+      image.onerror = reject;
+      image.src = source;
+    };
     reader.onerror = function () { reject(new Error("read error")); };
     reader.readAsDataURL(file);
   });
@@ -762,7 +844,7 @@ function initLoginPage() {
       input.style.display = "none";
       document.body.appendChild(input);
       input.addEventListener("change", function () {
-        fileToDataURL(input, 2 * 1024 * 1024, function (dataUrl) {
+          fileToDataURL(input, 10 * 1024 * 1024, function (dataUrl) {
           setupLogoDataUrl = dataUrl;
           var preview = $("setup-logo-preview");
           if (preview) { preview.src = dataUrl; preview.classList.remove("hidden"); }
@@ -806,6 +888,7 @@ function initLoginPage() {
       e.preventDefault();
       var payload = {
         name: $("setup-name").value.trim(),
+        site_name: $("setup-site-name").value.trim(),
         email: $("setup-email").value.trim(),
         password: $("setup-password").value,
         logo_data_url: setupLogoDataUrl,
@@ -1401,6 +1484,7 @@ function handleGmailQuery() {
 function renderCal() {
   var grid = $("cal-grid");
   if (!grid) return;
+  var renderVersion = ++calRenderVersion;
   grid.innerHTML = "";
   var year = calState.year;
   var month = calState.month;
@@ -1420,6 +1504,7 @@ function renderCal() {
   var daysInMonth = new Date(year, month + 1, 0).getDate();
 
   window.API.mechanic.getCalendar(year, month + 1).then(function (bookings) {
+    if (renderVersion !== calRenderVersion) return;
     var byDate = {};
     (bookings || []).forEach(function (b) {
       byDate[b.date] = b.statuses || [];
@@ -1444,6 +1529,7 @@ function renderCal() {
       grid.appendChild(cell);
     }
   }).catch(function () {
+    if (renderVersion !== calRenderVersion) return;
     for (var i = 0; i < firstDay; i++) {
       grid.appendChild(document.createElement("div"));
     }
@@ -1511,23 +1597,23 @@ function hourLabel12(h) {
 function reservedPeriodText(a, apptTime) {
   var unit = (apptTime && apptTime.unit) || "hours";
   var value = (apptTime && apptTime.value) || 2;
-  var text = "";
+  var text = t("cal_reserved") + ": (" + value + " " + (unit === "days" ? t("cal_reserved_days") : t("cal_reserved_hours")) + ") ";
   var base = formatLongDate(String(a.appointment_date));
   if (unit === "days") {
     if (value > 1) {
       var end = new Date(String(a.appointment_date) + "T12:00:00");
       end.setDate(end.getDate() + value - 1);
       var endStr = end.getFullYear() + "-" + pad2(end.getMonth() + 1) + "-" + pad2(end.getDate());
-      text = base + " - " + formatLongDate(endStr) + " (" + value + " " + t("cal_reserved_days") + ")";
+      text += base + " " + t("cal_reserved_to") + " " + formatLongDate(endStr);
     } else {
-      text = base + " (1 " + t("cal_reserved_days") + ")";
+      text += base;
     }
   } else {
     var tv = to12(a.appointment_time);
     var startHour = parseInt(String(a.appointment_time).split(":")[0], 10);
     var startLabel = tv.hour + ":" + tv.minute + " " + tv.ampm;
     var endLabel = hourLabel12(startHour + value);
-    text = base + ", " + startLabel + " - " + endLabel + " (" + value + " " + t("cal_reserved_hours") + ")";
+    text += base + ", " + startLabel + " - " + endLabel;
   }
   var extra = (a.reserved_dates || []).slice().sort();
   if (extra.length) {
@@ -1593,6 +1679,19 @@ function buildApptRow(a, apptTime) {
     });
   }
 
+  var reserved = document.createElement("div");
+  reserved.className = "mt-3 flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-100 bg-brand-50 px-4 py-3";
+  var reservedText = document.createElement("p");
+  reservedText.className = "min-w-0 flex-1 text-sm font-bold text-brand-800";
+  reservedText.textContent = reservedPeriodText(a, apptTime);
+  reserved.appendChild(reservedText);
+  reserved.appendChild(rowBtn(t("cal_reserved_edit"), "btn-secondary", function () {
+    openReservationPicker(a, function () {
+      refreshCalDay(String(a.appointment_date));
+    });
+  }));
+  row.appendChild(reserved);
+
   var actions = document.createElement("div");
   actions.className = "mt-4 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-4";
 
@@ -1629,19 +1728,6 @@ function buildApptRow(a, apptTime) {
   }));
 
   row.appendChild(actions);
-
-  var reserved = document.createElement("div");
-  reserved.className = "mt-4 flex items-center justify-between gap-2 border-t border-slate-200 pt-4";
-  var reservedInfo = document.createElement("div");
-  reservedInfo.className = "min-w-0 flex-1";
-  reservedInfo.appendChild(buildInfoTag(t("cal_reserved"), reservedPeriodText(a, apptTime)));
-  reserved.appendChild(reservedInfo);
-  reserved.appendChild(rowBtn(t("cal_reserved_edit"), "btn-secondary", function () {
-    openReservationPicker(a, function () {
-      refreshCalDay(String(a.appointment_date));
-    });
-  }));
-  row.appendChild(reserved);
 
   return row;
 }
@@ -1871,7 +1957,7 @@ function makeUploadButton(label, onChange) {
     input.style.display = "none";
     document.body.appendChild(input);
     input.addEventListener("change", function () {
-      fileToDataURL(input, 3 * 1024 * 1024, onChange);
+      fileToDataURL(input, 10 * 1024 * 1024, onChange);
       input.remove();
     });
     input.click();
@@ -2482,8 +2568,8 @@ function renderVehicleDetail(vehicleId) {
       { label: t("vehicles_plate"), value: v.plate },
       { label: t("vehicles_make"), value: v.make || "—" },
       { label: t("vehicles_model"), value: v.model || "—" },
+      { label: t("vehicles_engine"), value: v.engine || "—" },
       { label: t("vehicles_year"), value: v.year != null ? v.year : "—" },
-      { label: t("vehicles_color"), value: v.color || "—" },
     ];
     if (v.owners && v.owners.length) {
       items.push({ label: t("vehicles_owner"), value: ownersLabel(v.owners) });
@@ -2614,8 +2700,8 @@ function openVehicleModal(vehicle) {
     '<div><label class="field-label">' + escapeHTML(t("vehicles_plate")) + '</label><input id="v-plate" type="text" class="field-input uppercase" value="' + escapeHTML(vehicle ? vehicle.plate : "") + '" required></div>' +
     '<div><label class="field-label">' + escapeHTML(t("vehicles_make")) + '</label><input id="v-make" type="text" class="field-input" value="' + escapeHTML(vehicle ? vehicle.make : "") + '"></div>' +
     '<div><label class="field-label">' + escapeHTML(t("vehicles_model")) + '</label><input id="v-model" type="text" class="field-input" value="' + escapeHTML(vehicle ? vehicle.model : "") + '"></div>' +
+    '<div><label class="field-label">' + escapeHTML(t("vehicles_engine")) + '</label><input id="v-engine" type="text" class="field-input" value="' + escapeHTML(vehicle ? vehicle.engine || "" : "") + '"></div>' +
     '<div><label class="field-label">' + escapeHTML(t("vehicles_year")) + '</label><input id="v-year" type="number" min="1900" max="2200" class="field-input" value="' + (vehicle && vehicle.year ? vehicle.year : "") + '"></div>' +
-    '<div><label class="field-label">' + escapeHTML(t("vehicles_color")) + '</label><input id="v-color" type="text" class="field-input" value="' + escapeHTML(vehicle ? vehicle.color : "") + '"></div>' +
     "</div>" +
     '<div><label class="field-label">' + escapeHTML(t("vehicles_front_photo")) + "</label>" +
     '<div id="v-photo-zone">' + photoHtml + "</div></div>" +
@@ -2645,8 +2731,8 @@ function openVehicleModal(vehicle) {
       plate: $("v-plate").value.trim(),
       make: $("v-make").value.trim(),
       model: $("v-model").value.trim(),
+      engine: $("v-engine").value.trim(),
       year: $("v-year").value ? parseInt($("v-year").value, 10) : null,
-      color: $("v-color").value.trim(),
       front_photo: newPhoto || (vehicle ? vehicle.front_photo || "" : ""),
     };
     var btn = form.querySelector("button[type=submit]");
@@ -3127,7 +3213,7 @@ function priceRowsForm(state) {
     input.addEventListener("change", function () {
       var files = Array.prototype.slice.call(input.files || []);
       files.forEach(function (f) {
-        if (f.size > 3 * 1024 * 1024) { flash(t("vehicles_photo_too_large"), true); return; }
+        if (f.size > 10 * 1024 * 1024) { flash(t("vehicles_photo_too_large"), true); return; }
         readFileAsDataURL(f).then(function (dataUrl) {
           state.other_photos.push(dataUrl);
           renderOtherPhotos();
@@ -3283,6 +3369,7 @@ var settingsDays = [];
 var apptTimeState = { unit: "hours", value: 2 };
 var gmailLoaded = false;
 var whatsappLoaded = false;
+var siteSettingsLoaded = false;
 var settingsWired = false;
 
 function initSettingsView() {
@@ -3291,15 +3378,16 @@ function initSettingsView() {
     wireScheduleSectionTabs();
     settingsWired = true;
   }
-  initSettingsSchedule();
-  initSettingsDaysOff();
-  initApptTime();
+   initSettingsSchedule();
+   initSettingsDaysOff();
+   initApptTime();
+   initDirectSiteEditor();
   initGmail();
   initWhatsapp();
 }
 
 function wireSettingsTabs() {
-  var tabs = ["schedule", "appttime", "integrations"];
+  var tabs = ["schedule", "appttime", "site", "integrations"];
   tabs.forEach(function (name) {
     var btn = $("settings-tab-" + name);
     if (btn) {
@@ -3307,6 +3395,7 @@ function wireSettingsTabs() {
         setSettingsTab(name);
         if (name === "schedule") initSettingsSchedule();
         if (name === "appttime") initApptTime();
+        if (name === "site") initDirectSiteEditor();
         if (name === "integrations") { initGmail(); initWhatsapp(); }
       });
     }
@@ -3314,7 +3403,7 @@ function wireSettingsTabs() {
 }
 
 function setSettingsTab(name) {
-  ["schedule", "appttime", "integrations"].forEach(function (n) {
+  ["schedule", "appttime", "site", "integrations"].forEach(function (n) {
     var panel = $("settings-panel-" + n);
     if (panel) panel.classList.toggle("hidden", n !== name);
     var btn = $("settings-tab-" + n);
@@ -3879,6 +3968,555 @@ function saveApptTime() {
   });
 }
 
+var siteBackgroundImages = [];
+var siteBackgroundCount = 3;
+var siteBackgroundOpacity = 100;
+var siteBackgroundPages = ["home"];
+
+function initLegacySiteSettings() {
+  if (siteSettingsLoaded) return;
+  siteSettingsLoaded = true;
+  var tagline = $("site-tagline");
+  var siteName = $("site-name");
+  var siteTitle = $("site-title");
+  var logoBtn = $("site-logo-btn");
+  var logoPreview = $("site-logo-preview");
+  var uploadBtn = $("site-background-btn");
+  var saveBtn = $("site-settings-save");
+  var countInput = $("site-background-count");
+  var opacityInput = $("site-background-opacity");
+  var opacityValue = $("site-background-opacity-value");
+  var pageOptions = ["home", "schedule", "status", "garage", "appointments", "vehicles", "repairs"];
+  function renderBackgrounds() {
+    var preview = $("site-background-preview");
+    if (!preview) return;
+    preview.innerHTML = "";
+    siteBackgroundImages.forEach(function (src, index) {
+      var item = document.createElement("div");
+      item.className = "relative aspect-video overflow-hidden rounded-lg border border-slate-200 bg-white";
+      var image = document.createElement("img");
+      image.src = src;
+      image.className = "h-full w-full object-cover";
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "absolute right-1 top-1 h-6 w-6 rounded-full bg-red-500 text-sm leading-none text-white";
+      remove.textContent = "×";
+      remove.addEventListener("click", function () {
+        siteBackgroundImages.splice(index, 1);
+        renderBackgrounds();
+      });
+      item.appendChild(image);
+      item.appendChild(remove);
+      preview.appendChild(item);
+    });
+  }
+  var siteLogoDataUrl = "";
+  if (logoBtn) logoBtn.onclick = function () {
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.style.display = "none";
+    document.body.appendChild(input);
+    input.addEventListener("change", function () {
+      fileToDataURL(input, 10 * 1024 * 1024, function (dataUrl) {
+        siteLogoDataUrl = dataUrl;
+        if (logoPreview) {
+          logoPreview.src = dataUrl;
+          logoPreview.classList.remove("hidden");
+        }
+      });
+      input.remove();
+    });
+    input.click();
+  };
+  if (uploadBtn) uploadBtn.onclick = function () {
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.multiple = true;
+    input.style.display = "none";
+    document.body.appendChild(input);
+    input.addEventListener("change", function () {
+      var files = Array.prototype.slice.call(input.files || []);
+      Promise.all(files.map(function (file) {
+        if (file.size > 10 * 1024 * 1024) {
+          flash(t("vehicles_photo_too_large"), true);
+          return null;
+        }
+        return readFileAsDataURL(file).catch(function () { return null; });
+      })).then(function (images) {
+        images.forEach(function (image) { if (image) siteBackgroundImages.push(image); });
+        renderBackgrounds();
+      });
+      input.remove();
+    });
+    input.click();
+  };
+  function renderPageOptions() {
+    var wrap = $("site-background-pages");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    pageOptions.forEach(function (page) {
+      var label = document.createElement("label");
+      label.className = "flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm";
+      var input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = page;
+      input.checked = siteBackgroundPages.indexOf(page) !== -1;
+      input.addEventListener("change", function () {
+        if (input.checked) siteBackgroundPages.push(page);
+        else siteBackgroundPages = siteBackgroundPages.filter(function (item) { return item !== page; });
+      });
+      var text = document.createElement("span");
+      text.textContent = t("site_background_page_" + page);
+      label.appendChild(input);
+      label.appendChild(text);
+      wrap.appendChild(label);
+    });
+  }
+  function renderOpacity() {
+    if (opacityInput) opacityInput.value = String(siteBackgroundOpacity);
+    if (opacityValue) opacityValue.textContent = String(siteBackgroundOpacity) + "%";
+  }
+  if (opacityInput) opacityInput.oninput = function () {
+    siteBackgroundOpacity = parseInt(opacityInput.value, 10) || 0;
+    renderOpacity();
+  };
+  if (saveBtn) saveBtn.onclick = function () {
+    hideBox("site-settings-error");
+    hideBox("site-settings-success");
+    siteBackgroundCount = Math.max(3, Math.min(6, parseInt(countInput && countInput.value, 10) || 3));
+    if (siteBackgroundImages.length > 0 && siteBackgroundImages.length < siteBackgroundCount) {
+      showErrorBox("site-settings-error", t("site_background_minimum"));
+      return;
+    }
+    saveBtn.disabled = true;
+    window.API.mechanic.updateSiteSettings({
+      site_name: siteName ? siteName.value.trim() : "",
+      site_title: siteTitle ? siteTitle.value.trim() : "",
+      site_tagline: tagline ? tagline.value.trim() : "",
+      logo_data_url: siteLogoDataUrl || undefined,
+      background_images: siteBackgroundImages,
+      background_image_count: siteBackgroundCount,
+      background_opacity: siteBackgroundOpacity,
+      background_pages: siteBackgroundPages,
+    }).then(function () {
+      saveBtn.disabled = false;
+      showSuccessBox("site-settings-success", t("site_settings_saved"));
+    }).catch(function (err) {
+      saveBtn.disabled = false;
+      showErrorBox("site-settings-error", err.message || t("error_generic"));
+    });
+  };
+  window.API.mechanic.getSiteSettings().then(function (settings) {
+    if (siteName) siteName.value = settings.site_name || "";
+    if (siteTitle) siteTitle.value = settings.site_title || t("app_name");
+    if (tagline) tagline.value = settings.site_tagline || t("site_tagline_default");
+    siteLogoDataUrl = settings.logo_data_url || "";
+    if (logoPreview && siteLogoDataUrl) {
+      logoPreview.src = siteLogoDataUrl;
+      logoPreview.classList.remove("hidden");
+    }
+    siteBackgroundImages = settings.background_images || [];
+    siteBackgroundCount = settings.background_image_count || 3;
+    siteBackgroundOpacity = settings.background_opacity == null ? 100 : settings.background_opacity;
+    siteBackgroundPages = settings.background_pages && settings.background_pages.length ? settings.background_pages : ["home"];
+    if (countInput) countInput.value = String(siteBackgroundCount);
+    renderOpacity();
+    renderPageOptions();
+    renderBackgrounds();
+  }).catch(function (err) {
+    showErrorBox("site-settings-error", err.message || t("error_generic"));
+  });
+}
+
+function initSiteSettings() {
+  if (siteSettingsLoaded) return;
+  siteSettingsLoaded = true;
+  var lang = "es";
+  var content = null;
+  var layout = null;
+  var siteLogoDataUrl = "";
+  var imageTarget = { type: "hero", index: 0 };
+  var labels = {
+    hero: [
+      ["kicker", "home_kicker"], ["title", "home_hero_title"], ["emphasis", "home_hero_emphasis"],
+      ["copy", "home_hero_copy"], ["primary_cta", "home_hero_cta"], ["secondary_cta", "home_services_cta"],
+      ["trust_1", "home_trust_1"], ["trust_2", "home_trust_2"], ["feature_kicker", "home_feature_kicker"],
+      ["feature_title", "home_feature_title"], ["feature_copy", "home_feature_copy"],
+    ],
+    services: [["kicker", "services_kicker"], ["title", "home_services_title"], ["copy", "services_copy"]],
+    process: [["kicker", "process_kicker"], ["title", "process_title"]],
+    cta: [["title", "home_cta_title"], ["copy", "home_cta_copy"], ["button", "home_hero_cta"]],
+  };
+  var sections = ["hero", "services", "process", "cta"];
+  var sectionNames = { hero: "site_editor_section_hero", services: "site_editor_section_services", process: "site_editor_section_process", cta: "site_editor_section_cta" };
+
+  function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function activeLocale(section) {
+    return content[section][lang];
+  }
+  function setTextField(section, key, value) {
+    activeLocale(section)[key] = value;
+    renderPreview();
+  }
+  function buildTextInput(section, key, labelKey, value, onChange) {
+    var wrap = document.createElement("div");
+    var label = document.createElement("label");
+    label.className = "field-label";
+    label.textContent = t(labelKey);
+    var input = document.createElement("textarea");
+    input.rows = key === "copy" || key === "feature_copy" ? 3 : 2;
+    input.className = "field-input resize-y text-sm";
+    input.value = value || "";
+    input.addEventListener("input", function () { if (onChange) onChange(input.value); else setTextField(section, key, input.value); });
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    return wrap;
+  }
+  function renderContentFields() {
+    var root = $("homepage-editor-fields");
+    if (!root || !content) return;
+    root.innerHTML = "";
+    ["hero", "services", "process", "cta"].forEach(function (section) {
+      var group = document.createElement("div");
+      group.className = "homepage-editor-field-group";
+      var heading = document.createElement("p");
+      heading.className = "mb-2 text-xs font-black uppercase tracking-wider text-[#5272a3]";
+      heading.textContent = t("site_editor_content_" + section);
+      group.appendChild(heading);
+      labels[section].forEach(function (item) {
+        group.appendChild(buildTextInput(section, item[0], item[1], activeLocale(section)[item[0]]));
+      });
+      if (section === "services") {
+        content.services.cards.forEach(function (card, index) {
+          var cardGroup = document.createElement("div");
+          cardGroup.className = "mt-3 border-t border-slate-200 pt-3";
+          var cardLabel = document.createElement("p");
+          cardLabel.className = "mb-2 text-xs font-bold text-slate-500";
+          cardLabel.textContent = t("site_editor_service_card") + " " + (index + 1);
+          cardGroup.appendChild(cardLabel);
+          ["title", "copy"].forEach(function (key) {
+            var labelKey = key === "title" ? "service_" + ["oil", "brakes", "tuneup", "diagnostic"][index] + "_title" : "service_" + ["oil", "brakes", "tuneup", "diagnostic"][index] + "_copy";
+            var input = buildTextInput("services", key, labelKey, card[lang][key], function (value) { card[lang][key] = value; renderPreview(); });
+            cardGroup.appendChild(input);
+          });
+          group.appendChild(cardGroup);
+        });
+      }
+      if (section === "process") {
+        content.process[lang].steps.forEach(function (step, index) {
+          var stepGroup = document.createElement("div");
+          stepGroup.className = "mt-3 border-t border-slate-200 pt-3";
+          var stepLabel = document.createElement("p");
+          stepLabel.className = "mb-2 text-xs font-bold text-slate-500";
+          stepLabel.textContent = t("site_editor_process_step") + " " + (index + 1);
+          stepGroup.appendChild(stepLabel);
+          ["title", "copy"].forEach(function (key) {
+            stepGroup.appendChild(buildTextInput("process", key, key === "title" ? "process_" + ["one", "two", "three"][index] + "_title" : "process_" + ["one", "two", "three"][index] + "_copy", step[key], function (value) { step[key] = value; renderPreview(); }));
+          });
+          group.appendChild(stepGroup);
+        });
+      }
+      root.appendChild(group);
+    });
+  }
+  function previewSection(name) {
+    var c = content;
+    if (name === "hero") {
+      var h = c.hero[lang];
+      return '<section class="editor-preview-hero"><div><small>' + escapeHTML(h.kicker) + '</small><h2>' + escapeHTML(h.title) + ' <em>' + escapeHTML(h.emphasis) + '</em></h2><p>' + escapeHTML(h.copy) + '</p><div class="editor-preview-buttons"><b>' + escapeHTML(h.primary_cta) + '</b><span>' + escapeHTML(h.secondary_cta) + '</span></div></div><div class="editor-preview-feature"><small>' + escapeHTML(h.feature_kicker) + '</small><strong>' + escapeHTML(h.feature_title) + '</strong><p>' + escapeHTML(h.feature_copy) + '</p></div></section>';
+    }
+    if (name === "services") {
+      var s = c.services[lang];
+      return '<section class="editor-preview-section"><small>' + escapeHTML(s.kicker) + '</small><h2>' + escapeHTML(s.title) + '</h2><p>' + escapeHTML(s.copy) + '</p><div class="editor-preview-services">' + c.services.cards.map(function (card, index) { var item = card[lang]; var src = siteBackgroundImages[(layout.image_indices.services || [])[index]]; return '<article><div class="editor-preview-service-image"' + (src ? ' style="background-image:url(\'' + escapeHTML(src) + '\')"' : '') + '></div><strong>' + escapeHTML(item.title) + '</strong><span>' + escapeHTML(item.copy) + '</span></article>'; }).join("") + '</div></section>';
+    }
+    if (name === "process") {
+      var p = c.process[lang];
+      return '<section class="editor-preview-section editor-preview-process"><small>' + escapeHTML(p.kicker) + '</small><h2>' + escapeHTML(p.title) + '</h2><div class="editor-preview-steps">' + p.steps.map(function (step, index) { return '<article><b>0' + (index + 1) + '</b><strong>' + escapeHTML(step.title) + '</strong><span>' + escapeHTML(step.copy) + '</span></article>'; }).join("") + '</div></section>';
+    }
+    var cta = c.cta[lang];
+    return '<section class="editor-preview-cta"><h2>' + escapeHTML(cta.title) + '</h2><p>' + escapeHTML(cta.copy) + '</p><b>' + escapeHTML(cta.button) + '</b></section>';
+  }
+  function renderPreview() {
+    var preview = $("homepage-editor-preview");
+    if (!preview || !content || !layout) return;
+    var html = "";
+    layout.section_order.forEach(function (name) {
+      if (layout.section_visibility[name]) html += previewSection(name);
+    });
+    preview.innerHTML = html;
+    var heroSize = $("homepage-size-hero");
+    if (heroSize) preview.style.setProperty("--editor-hero-height", heroSize.value + "px");
+  }
+  function renderSections() {
+    var root = $("homepage-editor-sections");
+    if (!root || !layout) return;
+    root.innerHTML = "";
+    layout.section_order.forEach(function (name, index) {
+      var row = document.createElement("div");
+      row.className = "flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2";
+      var check = document.createElement("input");
+      check.type = "checkbox";
+      check.checked = layout.section_visibility[name] !== false;
+      check.addEventListener("change", function () { layout.section_visibility[name] = check.checked; renderPreview(); });
+      var label = document.createElement("span");
+      label.className = "flex-1 text-sm font-semibold text-slate-700";
+      label.textContent = t(sectionNames[name]);
+      row.appendChild(check);
+      row.appendChild(label);
+      ["↑", "↓"].forEach(function (symbol, direction) {
+        var move = document.createElement("button");
+        move.type = "button";
+        move.className = "rounded-md border border-slate-200 px-2 py-1 text-sm font-bold text-slate-600 hover:bg-slate-50";
+        move.textContent = symbol;
+        move.disabled = direction === 0 ? index === 0 : index === layout.section_order.length - 1;
+        move.addEventListener("click", function () {
+          var next = index + (direction === 0 ? -1 : 1);
+          var swap = layout.section_order[next];
+          layout.section_order[next] = name;
+          layout.section_order[index] = swap;
+          renderSections();
+          renderPreview();
+        });
+        row.appendChild(move);
+      });
+      root.appendChild(row);
+    });
+  }
+  function renderImages() {
+    var preview = $("site-background-preview");
+    var targets = $("homepage-editor-image-targets");
+    if (preview) {
+      preview.innerHTML = "";
+      siteBackgroundImages.forEach(function (src, index) {
+        var item = document.createElement("div");
+        item.className = "relative aspect-video overflow-hidden rounded-lg border border-slate-200 bg-white";
+        item.innerHTML = '<img class="h-full w-full object-cover" src="' + escapeHTML(src) + '" /><button type="button" class="absolute right-1 top-1 h-6 w-6 rounded-full bg-red-500 text-sm leading-none text-white">×</button>';
+        item.querySelector("button").addEventListener("click", function () { siteBackgroundImages.splice(index, 1); renderImages(); renderPreview(); });
+        preview.appendChild(item);
+      });
+    }
+    if (targets) {
+      targets.innerHTML = "";
+      var targetList = [{ type: "hero", label: t("site_editor_hero_image") }];
+      layout.image_indices.services.forEach(function (_, index) { targetList.push({ type: "service", index: index, label: t("site_editor_service_image") + " " + (index + 1) }); });
+      targetList.forEach(function (target) {
+        var row = document.createElement("label");
+        row.className = "flex items-center gap-2 text-xs font-semibold text-slate-600";
+        var text = document.createElement("span");
+        text.className = "w-28 shrink-0";
+        text.textContent = target.label;
+        var select = document.createElement("select");
+        select.className = "field-input py-1 text-xs";
+        var current = target.type === "hero" ? layout.image_indices.hero : layout.image_indices.services[target.index];
+        for (var i = 0; i < siteBackgroundImages.length; i++) select.add(new Option(t("site_editor_image") + " " + (i + 1), String(i)));
+        select.value = String(current == null ? 0 : current);
+        select.addEventListener("change", function () { if (target.type === "hero") layout.image_indices.hero = parseInt(select.value, 10); else layout.image_indices.services[target.index] = parseInt(select.value, 10); renderPreview(); });
+        row.appendChild(text); row.appendChild(select); targets.appendChild(row);
+      });
+    }
+  }
+  function renderSizes() {
+    var map = { "homepage-size-hero": "hero_min_height", "homepage-size-padding": "section_padding", "homepage-size-card": "service_card_image_height", "homepage-size-cta": "cta_padding" };
+    Object.keys(map).forEach(function (id) { var input = $(id); if (input) { input.value = String(layout.sizes[map[id]]); input.oninput = function () { layout.sizes[map[id]] = parseInt(input.value, 10); renderPreview(); }; } });
+  }
+  function renderLanguageButtons() {
+    ["es", "en"].forEach(function (code) { var button = $("homepage-editor-lang-" + code); if (button) { button.classList.toggle("is-active", code === lang); button.onclick = function () { lang = code; renderLanguageButtons(); renderContentFields(); renderPreview(); }; } });
+  }
+  var tagline = $("site-tagline");
+  var siteName = $("site-name");
+  var siteTitle = $("site-title");
+  var logoBtn = $("site-logo-btn");
+  var logoPreview = $("site-logo-preview");
+  var uploadBtn = $("site-background-btn");
+  if (logoBtn) logoBtn.onclick = function () { var input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.onchange = function () { fileToDataURL(input, 10 * 1024 * 1024, function (dataUrl) { siteLogoDataUrl = dataUrl; logoPreview.src = dataUrl; logoPreview.classList.remove("hidden"); }); }; input.click(); };
+  if (uploadBtn) uploadBtn.onclick = function () { var input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.multiple = true; input.onchange = function () { Promise.all(Array.prototype.slice.call(input.files || []).map(function (file) { return readFileAsDataURL(file).catch(function () { return null; }); })).then(function (images) { images.forEach(function (image) { if (image) siteBackgroundImages.push(image); }); renderImages(); renderPreview(); }); }; input.click(); };
+  if ($("site-settings-save")) $("site-settings-save").onclick = function () { hideBox("site-settings-error"); hideBox("site-settings-success"); var save = $("site-settings-save"); save.disabled = true; window.API.mechanic.updateSiteSettings({ site_name: siteName.value.trim(), site_title: siteTitle.value.trim(), site_tagline: tagline.value.trim(), logo_data_url: siteLogoDataUrl || undefined, background_images: siteBackgroundImages, background_image_count: siteBackgroundCount, background_opacity: siteBackgroundOpacity, background_pages: siteBackgroundPages, homepage_content: content, homepage_layout: layout }).then(function () { save.disabled = false; showSuccessBox("site-settings-success", t("site_settings_saved")); }).catch(function (err) { save.disabled = false; showErrorBox("site-settings-error", err.message || t("error_generic")); }); };
+  window.API.mechanic.getSiteSettings().then(function (settings) {
+    siteName.value = settings.site_name || ""; siteTitle.value = settings.site_title || t("app_name"); tagline.value = settings.site_tagline || t("site_tagline_default"); siteLogoDataUrl = settings.logo_data_url || "";
+    if (siteLogoDataUrl) { logoPreview.src = siteLogoDataUrl; logoPreview.classList.remove("hidden"); }
+    siteBackgroundImages = settings.background_images || []; siteBackgroundCount = settings.background_image_count || 3; siteBackgroundOpacity = settings.background_opacity == null ? 100 : settings.background_opacity; siteBackgroundPages = settings.background_pages || ["home"];
+    content = clone(settings.homepage_content); layout = clone(settings.homepage_layout); renderLanguageButtons(); renderContentFields(); renderSections(); renderSizes(); renderImages(); renderPreview();
+  }).catch(function (err) { showErrorBox("site-settings-error", err.message || t("error_generic")); });
+}
+
+var directSiteEditorLoaded = false;
+
+function initDirectSiteEditor() {
+  if (directSiteEditorLoaded) return;
+  directSiteEditorLoaded = true;
+  var openButton = $("site-edit-website");
+  var overlay = document.createElement("div");
+  overlay.id = "site-editor-overlay";
+  overlay.className = "website-editor-overlay hidden";
+  overlay.innerHTML =
+    '<div class="website-editor-dialog">' +
+      '<header class="website-editor-toolbar">' +
+        '<div><p class="text-xs font-black uppercase tracking-[0.16em] text-[#c7f36a]">' + t("site_editor_open") + '</p><h2 class="text-lg font-black text-white">' + t("site_editor_preview_title") + '</h2></div>' +
+        '<div class="flex flex-wrap items-center justify-end gap-2">' +
+          '<button type="button" id="site-editor-lang-es" class="website-editor-lang is-active">ES</button>' +
+          '<button type="button" id="site-editor-lang-en" class="website-editor-lang">EN</button>' +
+          '<button type="button" id="site-editor-upload" class="website-editor-tool">' + t("site_editor_upload") + '</button>' +
+          '<button type="button" id="site-editor-close" class="website-editor-tool">' + t("site_editor_close") + '</button>' +
+          '<button type="button" id="site-editor-save" class="website-editor-save">Guardar cambios</button>' +
+        '</div>' +
+      '</header>' +
+      '<div class="website-editor-options"><div id="site-editor-section-tools" class="flex flex-wrap gap-2"></div><label>' + t("site_editor_hero_size") + ' <input id="site-editor-size-hero" type="range" min="320" max="900" step="10" /></label><label>' + t("site_editor_sections_size") + ' <input id="site-editor-size-padding" type="range" min="16" max="160" step="8" /></label><label>' + t("site_editor_cards_size") + ' <input id="site-editor-size-card" type="range" min="100" max="360" step="10" /></label></div>' +
+      '<div id="site-editor-preview" class="website-editor-canvas"></div>' +
+      '<div id="site-editor-status" class="hidden px-5 py-3 text-sm"></div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  var preview = $("site-editor-preview");
+  var status = $("site-editor-status");
+  var content = null;
+  var layout = null;
+   var siteMeta = { site_name: "", site_title: "", site_tagline: "", logo_data_url: "" };
+   var images = [];
+   var lang = "es";
+   var logoButton = $("site-logo-direct-btn");
+   var logoPreview = $("site-logo-direct-preview");
+   var logoStatus = $("site-logo-direct-status");
+   var logoWidthInput = $("site-logo-width");
+   var logoHeightInput = $("site-logo-height");
+   var logoWidthValue = $("site-logo-width-value");
+   var logoHeightValue = $("site-logo-height-value");
+   var logoSizeSave = $("site-logo-size-save");
+
+   function renderDirectLogo() {
+     if (!logoPreview) return;
+     if (siteMeta.logo_data_url) {
+       logoPreview.src = siteMeta.logo_data_url;
+       logoPreview.classList.remove("hidden");
+     } else {
+       logoPreview.removeAttribute("src");
+       logoPreview.classList.add("hidden");
+     }
+   }
+
+   function showDirectLogoStatus(message, isError) {
+     if (!logoStatus) return;
+     logoStatus.textContent = message;
+     logoStatus.className = "mt-2 text-sm " + (isError ? "text-red-600" : "text-emerald-600");
+   }
+
+   function renderLogoSize() {
+     var width = Number(siteMeta.logo_width) || 160;
+     var height = Number(siteMeta.logo_height) || 64;
+     if (logoWidthInput) logoWidthInput.value = String(width);
+     if (logoHeightInput) logoHeightInput.value = String(height);
+     if (logoWidthValue) logoWidthValue.textContent = width + "px";
+     if (logoHeightValue) logoHeightValue.textContent = height + "px";
+   }
+
+   if (logoWidthInput) logoWidthInput.oninput = function () {
+     if (logoWidthValue) logoWidthValue.textContent = logoWidthInput.value + "px";
+   };
+   if (logoHeightInput) logoHeightInput.oninput = function () {
+     if (logoHeightValue) logoHeightValue.textContent = logoHeightInput.value + "px";
+   };
+   if (logoSizeSave) logoSizeSave.onclick = function () {
+     var width = Math.max(80, Math.min(320, Number(logoWidthInput && logoWidthInput.value) || 160));
+     var height = Math.max(32, Math.min(120, Number(logoHeightInput && logoHeightInput.value) || 64));
+     logoSizeSave.disabled = true;
+     window.API.mechanic.updateSiteSettings({ logo_width: width, logo_height: height }).then(function () {
+       siteMeta.logo_width = width;
+       siteMeta.logo_height = height;
+       logoSizeSave.disabled = false;
+       renderLogoSize();
+       showDirectLogoStatus(t("site_settings_saved"), false);
+     }).catch(function (err) {
+       logoSizeSave.disabled = false;
+       showDirectLogoStatus(err.message || t("error_generic"), true);
+     });
+   };
+
+   if (logoButton) logoButton.onclick = function () {
+     var input = document.createElement("input");
+     input.type = "file";
+     input.accept = "image/*";
+     input.onchange = function () {
+       var file = input.files && input.files[0];
+       if (!file) return;
+       logoButton.disabled = true;
+        readFileAsDataURL(file, true).then(function (src) {
+         siteMeta.logo_data_url = src;
+         renderDirectLogo();
+         return window.API.mechanic.updateSiteSettings({ logo_data_url: src });
+       }).then(function () {
+         logoButton.disabled = false;
+         showDirectLogoStatus(t("site_settings_saved"), false);
+       }).catch(function (err) {
+         logoButton.disabled = false;
+         showDirectLogoStatus(err.message || t("error_generic"), true);
+       });
+     };
+     input.click();
+   };
+
+  function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function getPath(root, path) { return path.split(".").reduce(function (value, key) { return value == null ? undefined : value[key]; }, root); }
+  function setPath(root, path, value) {
+    var parts = path.split(".");
+    var target = root;
+    parts.slice(0, -1).forEach(function (key) { if (!target[key]) target[key] = {}; target = target[key]; });
+    target[parts[parts.length - 1]] = value;
+  }
+  function edit(path, value, className) {
+    return '<span class="website-editor-editable ' + (className || "") + '" contenteditable="true" spellcheck="true" data-direct-edit="' + path + '">' + escapeHTML(value || "") + '</span>';
+  }
+  function editSite(path, value, className) {
+    return '<span class="website-editor-editable ' + (className || "") + '" contenteditable="true" spellcheck="true" data-direct-site-edit="' + path + '">' + escapeHTML(value || "") + '</span>';
+  }
+  function imageSelect(type, index) {
+    return '<button type="button" class="website-editor-image-upload" data-direct-upload="' + type + (index == null ? "" : ":" + index) + '">' + t("site_editor_upload_file") + '</button>';
+  }
+  function sectionFrame(name, html) {
+    return '<section class="website-editor-section" data-editor-section="' + name + '"><div class="website-editor-section-tools"><button type="button" data-editor-up="' + name + '">↑</button><button type="button" data-editor-down="' + name + '">↓</button><button type="button" data-editor-toggle="' + name + '">' + (layout.section_visibility[name] ? t("site_editor_hide") : t("site_editor_show")) + '</button></div>' + html + '</section>';
+  }
+  function sectionHtml(name) {
+    if (name === "hero") {
+      var h = content.hero[lang];
+      var heroImage = images[layout.image_indices.hero];
+      return sectionFrame(name, '<div class="website-editor-hero"' + (heroImage ? ' style="background-image:linear-gradient(90deg,rgba(11,22,40,.96),rgba(11,22,40,.55)),url(\'' + escapeHTML(heroImage) + '\')"' : "") + '><div><small>' + edit("hero.kicker", h.kicker) + '</small><h1>' + edit("hero.title", h.title) + ' <em>' + edit("hero.emphasis", h.emphasis) + '</em></h1><p>' + edit("hero.copy", h.copy) + '</p><div class="website-editor-buttons"><b>' + edit("hero.primary_cta", h.primary_cta) + '</b><span>' + edit("hero.secondary_cta", h.secondary_cta) + '</span></div></div><div class="website-editor-feature"><small>' + edit("hero.feature_kicker", h.feature_kicker) + '</small><strong>' + edit("hero.feature_title", h.feature_title) + '</strong><p>' + edit("hero.feature_copy", h.feature_copy) + '</p></div>' + imageSelect("hero") + '</div>');
+    }
+    if (name === "services") {
+      var s = content.services[lang];
+      var cards = content.services.cards.map(function (card, index) { var item = card[lang]; var src = images[layout.image_indices.services[index]]; return '<article><div class="website-editor-service-image"' + (src ? ' style="background-image:url(\'' + escapeHTML(src) + '\')"' : "") + '>' + imageSelect("service", index) + '</div><h3>' + edit("services.cards." + index + ".title", item.title) + '</h3><p>' + edit("services.cards." + index + ".copy", item.copy) + '</p></article>'; }).join("");
+      return sectionFrame(name, '<div class="website-editor-light"><small>' + edit("services.kicker", s.kicker) + '</small><h2>' + edit("services.title", s.title) + '</h2><p>' + edit("services.copy", s.copy) + '</p><div class="website-editor-services">' + cards + '</div></div>');
+    }
+    if (name === "process") {
+      var p = content.process[lang];
+      return sectionFrame(name, '<div class="website-editor-light website-editor-process"><small>' + edit("process.kicker", p.kicker) + '</small><h2>' + edit("process.title", p.title) + '</h2><div class="website-editor-steps">' + p.steps.map(function (step, index) { return '<article><b>0' + (index + 1) + '</b><h3>' + edit("process.steps." + index + ".title", step.title) + '</h3><p>' + edit("process.steps." + index + ".copy", step.copy) + '</p></article>'; }).join("") + '</div></div>');
+    }
+    var cta = content.cta[lang];
+    return sectionFrame(name, '<div class="website-editor-cta"><h2>' + edit("cta.title", cta.title) + '</h2><p>' + edit("cta.copy", cta.copy) + '</p><b>' + edit("cta.button", cta.button) + '</b></div>');
+  }
+  function renderSections() {
+    preview.innerHTML = '<header class="website-editor-site-header"><div class="website-editor-site-mark">M</div><div><strong>' + editSite("site_name", siteMeta.site_name, "text-white") + '</strong><span>' + editSite("site_title", siteMeta.site_title, "text-white") + '</span><small>' + editSite("site_tagline", siteMeta.site_tagline, "text-slate-300") + '</small></div></header>' + layout.section_order.filter(function (name) { return layout.section_visibility[name]; }).map(sectionHtml).join("");
+    preview.querySelectorAll("[data-direct-edit]").forEach(function (el) { el.addEventListener("input", function () { var section = el.closest("[data-editor-section]").dataset.editorSection; var path = el.dataset.directEdit.indexOf(section + ".") === 0 ? el.dataset.directEdit.slice(section.length + 1) : el.dataset.directEdit; setPath(content[section][lang], path, el.textContent); }); });
+    preview.querySelectorAll("[data-direct-site-edit]").forEach(function (el) { el.addEventListener("input", function () { siteMeta[el.dataset.directSiteEdit] = el.textContent; }); });
+    preview.querySelectorAll("[data-direct-upload]").forEach(function (button) { button.addEventListener("click", function () { var input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.onchange = function () { var file = input.files && input.files[0]; if (!file) return; readFileAsDataURL(file).then(function (src) { var parts = button.dataset.directUpload.split(":"); var imageIndex = parts[0] === "hero" ? Number(layout.image_indices.hero) : Number(layout.image_indices.services[parseInt(parts[1], 10)]); if (!Number.isInteger(imageIndex) || imageIndex < 0 || imageIndex > 5) imageIndex = images.length < 6 ? images.length : 0; images[imageIndex] = src; if (parts[0] === "hero") layout.image_indices.hero = imageIndex; else layout.image_indices.services[parseInt(parts[1], 10)] = imageIndex; renderSections(); }).catch(function () { flash(t("image_processing_error"), true); }); }; input.click(); }); });
+    preview.querySelectorAll("[data-editor-toggle]").forEach(function (button) { button.addEventListener("click", function () { var name = button.dataset.editorToggle; layout.section_visibility[name] = !layout.section_visibility[name]; renderSectionTools(); renderSections(); }); });
+    preview.querySelectorAll("[data-editor-up], [data-editor-down]").forEach(function (button) { button.addEventListener("click", function () { var name = button.dataset.editorUp || button.dataset.editorDown; var index = layout.section_order.indexOf(name); var next = button.dataset.editorUp ? index - 1 : index + 1; if (next < 0 || next >= layout.section_order.length) return; layout.section_order[index] = layout.section_order[next]; layout.section_order[next] = name; renderSectionTools(); renderSections(); }); });
+  }
+  function renderSectionTools() {
+    var root = $("site-editor-section-tools");
+    root.innerHTML = layout.section_order.map(function (name) { return '<span class="website-editor-section-chip ' + (layout.section_visibility[name] ? "is-visible" : "") + '">' + escapeHTML(t("site_editor_section_" + name)) + '</span>'; }).join("");
+  }
+  function wireToolbar() {
+    ["es", "en"].forEach(function (code) { $("site-editor-lang-" + code).onclick = function () { lang = code; $("site-editor-lang-es").classList.toggle("is-active", lang === "es"); $("site-editor-lang-en").classList.toggle("is-active", lang === "en"); renderSections(); }; });
+    $("site-editor-close").onclick = function () { overlay.classList.add("hidden"); };
+    $("site-editor-size-hero").oninput = function () { layout.sizes.hero_min_height = parseInt(this.value, 10); preview.style.setProperty("--editor-hero-height", this.value + "px"); };
+    $("site-editor-size-padding").oninput = function () { layout.sizes.section_padding = parseInt(this.value, 10); };
+    $("site-editor-size-card").oninput = function () { layout.sizes.service_card_image_height = parseInt(this.value, 10); };
+    $("site-editor-upload").onclick = function () { var input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.multiple = true; input.onchange = function () { Promise.all(Array.prototype.slice.call(input.files || []).map(function (file) { return readFileAsDataURL(file).catch(function () { return null; }); })).then(function (loaded) { loaded.forEach(function (src) { if (src) images.push(src); }); renderSections(); }); }; input.click(); };
+    $("site-editor-save").onclick = function () { preview.querySelectorAll("[data-direct-edit]").forEach(function (el) { var section = el.closest("[data-editor-section]").dataset.editorSection; var path = el.dataset.directEdit.indexOf(section + ".") === 0 ? el.dataset.directEdit.slice(section.length + 1) : el.dataset.directEdit; setPath(content[section][lang], path, el.textContent.trim()); }); preview.querySelectorAll("[data-direct-site-edit]").forEach(function (el) { siteMeta[el.dataset.directSiteEdit] = el.textContent.trim(); }); layout.image_indices.hero = Math.max(0, Math.min(5, Number(layout.image_indices.hero) || 0)); layout.image_indices.services = layout.image_indices.services.map(function (index) { return Math.max(0, Math.min(5, Number(index) || 0)); }); var save = $("site-editor-save"); save.disabled = true; window.API.mechanic.updateSiteSettings({ site_name: siteMeta.site_name, site_title: siteMeta.site_title, site_tagline: siteMeta.site_tagline, logo_data_url: siteMeta.logo_data_url || undefined, background_images: images, background_image_count: Math.max(3, Math.min(6, images.length || 3)), background_opacity: 100, background_pages: ["home"], homepage_content: content, homepage_layout: layout }).then(function () { save.disabled = false; status.textContent = t("site_editor_saved"); status.className = "px-5 py-3 text-sm text-emerald-700 bg-emerald-50"; }).catch(function (err) { save.disabled = false; status.textContent = err.message || t("error_generic"); status.className = "px-5 py-3 text-sm text-red-700 bg-red-50"; }); };
+  }
+  openButton.onclick = function () { overlay.classList.remove("hidden"); renderSectionTools(); renderSections(); $("site-editor-size-hero").value = layout.sizes.hero_min_height; $("site-editor-size-padding").value = layout.sizes.section_padding; $("site-editor-size-card").value = layout.sizes.service_card_image_height; };
+   window.API.mechanic.getSiteSettings().then(function (settings) { content = clone(settings.homepage_content); layout = clone(settings.homepage_layout); images = settings.background_images || []; siteMeta = { site_name: settings.site_name || "", site_title: settings.site_title || "", site_tagline: settings.site_tagline || "", logo_data_url: settings.logo_data_url || "", logo_width: settings.logo_width || 160, logo_height: settings.logo_height || 64 }; renderDirectLogo(); renderLogoSize(); wireToolbar(); }).catch(function (err) { showErrorBox("site-editor-error", err.message || t("error_generic")); });
+}
+
 function initGmail() {
   if (gmailLoaded) return;
   gmailLoaded = true;
@@ -4124,6 +4762,14 @@ function attachLandingButtonListeners() {
   mirrorClick("sidebar-announce", "landing-announce");
   mirrorClick("sidebar-settings", "landing-settings");
   mirrorClick("sidebar-users", "landing-users");
+  var createBtn = $("sidebar-create");
+  if (createBtn) {
+    createBtn.addEventListener("click", function () {
+      showView("create");
+      var sidebar = $("app-sidebar");
+      if (sidebar) sidebar.classList.add("-translate-x-full");
+    });
+  }
   var sidebarToggle = $("sidebar-toggle");
   var sidebar = $("app-sidebar");
   if (sidebarToggle && sidebar) sidebarToggle.addEventListener("click", function () { sidebar.classList.toggle("-translate-x-full"); });

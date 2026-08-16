@@ -20,7 +20,8 @@ client management, announcements, settings, and a Gmail email integration.
   available time slots are shown.
 - **Check appointment status** by phone + plate: view details, edit or cancel.
 - **Client accounts** — register / log in to get a personalized experience.
-- **Mi garaje (My garage)** — a private hub with three sections:
+- **Mi cuenta / Mi garaje (My account / My garage)** — signing in opens a choice
+  between booking and the private vehicle area:
   - **Citas (Appointments):** a live list of your appointments with their status
     (updates automatically in real time — no refresh needed).
   - **Vehículos (Vehicles):** register your vehicles (plate, make, model, year,
@@ -76,8 +77,10 @@ client management, announcements, settings, and a Gmail email integration.
 - **Users (admin only):** create/edit users, reset passwords, activate/deactivate
   and delete.
 - **Settings:** per-day work schedule (with optional lunch break), **days off**
-  (multi-date calendar picker with reason), and how long each appointment blocks
-  availability (in hours or days).
+  (multi-date calendar picker with reason), how long each appointment blocks
+  availability (in hours or days), and public site customization. The site editor
+  can upload the logo, use the navy brand background, and save its width and height
+  independently.
 - **Gmail integration:** OAuth 2.0 setup to send appointment, client and test
   emails directly from the panel.
 
@@ -119,11 +122,9 @@ password, and optionally upload a logo). That first account has the `admin` role
    You'll get an appointment number (e.g. `APT-20260616-0001`).
 3. **Consultar cita (Status):** enter the phone and plate used when booking to
    see the appointment, edit it or cancel it.
-4. **Mi garaje (My garage):** sign in (or register) to open your garage:
-   - **Citas** — view all your appointments and their status.
-   - **Vehículos** — add, edit (gear menu) or remove your vehicles.
-   - **Servicios** — open a vehicle's service history and expand each record to
-     see the diagnosis, mileage photo, prices and photos.
+4. **Mi cuenta (My account):** after signing in, choose **Agendar cita** or
+   **Mi garaje**. The garage shortcut opens the vehicle area directly, where you
+   can add, edit (gear menu) or remove vehicles and open their service history.
 5. Switch the language with the gear icon in the top-right corner.
 
 ### As the mechanic
@@ -142,7 +143,9 @@ password, and optionally upload a logo). That first account has the `admin` role
    - **Clientes** — search clients, send them emails, and (as admin) delete them.
    - **Anuncios** — publish banner announcements.
    - **Usuarios** (admin only) — manage panel accounts.
-   - **Configuración** — work schedule, days off, appointment time, Gmail.
+   - **Configuración** — work schedule, days off, appointment time, Gmail and
+     **Sitio**. In the Site tab, use **Cambiar logo**, then adjust **Ancho del logo**
+     (`80–320px`) and **Altura del logo** (`32–120px`) and click **Guardar tamaño**.
 
 ---
 

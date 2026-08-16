@@ -79,14 +79,14 @@
   function openAccountModal() {
     var c = currentClient();
     var overlay = document.createElement("div");
-    overlay.className = "fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4";
+    overlay.className = "auth-modal-overlay";
     overlay.innerHTML =
-      '<div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">' +
-        '<div class="flex items-center justify-between mb-4">' +
+      '<div class="auth-modal-card">' +
+        '<div class="auth-modal-header">' +
           '<h2 class="text-xl font-bold" id="account-modal-title"></h2>' +
-          '<button type="button" id="account-modal-close" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>' +
+          '<button type="button" id="account-modal-close" class="auth-modal-close">&times;</button>' +
         '</div>' +
-        '<div id="account-modal-body"></div>' +
+        '<div id="account-modal-body" class="auth-modal-body"></div>' +
       '</div>';
     document.body.appendChild(overlay);
     document.getElementById("account-modal-title").textContent = t("client_my_account");
@@ -179,22 +179,41 @@
       host.innerHTML = "";
       var loggedIn = isLoggedIn();
       if (loggedIn) {
-        var c = currentClient();
-        var hello = document.createElement("span");
-        hello.className = "text-sm text-slate-700 font-medium";
-        hello.textContent = t("client_hello") + ", " + c.first_name;
-        host.appendChild(hello);
+        var accountHome = window.location.pathname === "/user/" || window.location.pathname === "/user/index.html";
+        if (accountHome) host.appendChild(buildHeaderAction("/user/account.html", "account_nav", "person.svg"));
       } else {
         var btn = document.createElement("button");
         btn.type = "button";
         btn.className = "px-3 py-1.5 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700";
-        btn.textContent = t("client_login_register");
+        var fullLabel = document.createElement("span");
+        fullLabel.className = "client-login-label-full";
+        fullLabel.textContent = t("client_login_register");
+        var shortLabel = document.createElement("span");
+        shortLabel.className = "client-login-label-short";
+        shortLabel.textContent = t("client_login");
+        btn.appendChild(fullLabel);
+        btn.appendChild(shortLabel);
         btn.addEventListener("click", function () { openModal("login"); });
         host.appendChild(btn);
       }
       buildGearMenu(host, loggedIn);
     });
     if (window.I18N && window.I18N.buildSwitcher) window.I18N.buildSwitcher();
+  }
+
+  function buildHeaderAction(href, labelKey, iconName) {
+    var link = document.createElement("a");
+    link.href = href;
+    link.className = "client-header-action";
+    var icon = document.createElement("img");
+    icon.src = "/icons/" + iconName;
+    icon.alt = "";
+    icon.className = "h-4 w-4 shrink-0";
+    var label = document.createElement("span");
+    label.textContent = t(labelKey);
+    link.appendChild(icon);
+    link.appendChild(label);
+    return link;
   }
 
   function field(id, type, labelKey, placeholderKey, required) {
@@ -216,14 +235,14 @@
 
   function openModal(mode) {
     var overlay = document.createElement("div");
-    overlay.className = "fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4";
+    overlay.className = "auth-modal-overlay";
     overlay.innerHTML =
-      '<div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">' +
-        '<div class="flex items-center justify-between mb-4">' +
+      '<div class="auth-modal-card">' +
+        '<div class="auth-modal-header">' +
           '<h2 class="text-xl font-bold" id="auth-modal-title"></h2>' +
-          '<button type="button" id="auth-modal-close" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>' +
+          '<button type="button" id="auth-modal-close" class="auth-modal-close">&times;</button>' +
         '</div>' +
-        '<div id="auth-modal-body"></div>' +
+        '<div id="auth-modal-body" class="auth-modal-body"></div>' +
       '</div>';
     document.body.appendChild(overlay);
 
@@ -303,6 +322,7 @@
       render();
       prefillForm();
       document.dispatchEvent(new CustomEvent("client:login", { detail: data.client }));
+      window.location.href = "/user/account.html";
     }
 
     overlay.querySelector("#auth-modal-close").addEventListener("click", function () { overlay.remove(); });

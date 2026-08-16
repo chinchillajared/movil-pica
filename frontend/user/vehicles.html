@@ -7,33 +7,30 @@
     <link rel="stylesheet" href="/shared/styles.css" />
   </head>
   <body class="app-shell flex flex-col">
-    <header class="app-header">
-      <div class="flex items-center gap-3">
-        <img data-site-logo alt="" class="hidden h-8 w-auto" />
-        <a href="/user/garage.html" class="btn-secondary" data-i18n="btn_back">Back</a>
-      </div>
-      <div class="flex items-center gap-2">
-        <div data-auth-ui class="flex items-center gap-2"></div>
-      </div>
+    <header class="public-header">
+      <a href="/user/" data-history-back class="public-back-button btn-secondary" data-i18n="btn_back">Volver</a>
+      <nav class="public-nav"><a href="/user/" data-i18n="nav_home">Inicio</a><a href="/user/schedule.html" data-i18n="nav_schedule">Agendar cita</a><a href="/user/vehicles.html" class="current" data-i18n="nav_garage">Mi garaje</a></nav>
+      <div class="flex items-center gap-2"><div data-auth-ui class="flex items-center gap-2"></div></div>
     </header>
 
     <div id="announcement-banner" class="hidden"></div>
 
-    <main class="flex-1 p-6 flex items-start justify-center">
+    <main class="page-main flex-1">
       <section id="login-required" class="card w-full max-w-md text-center hidden">
         <h1 class="text-2xl font-bold mb-3" data-i18n="vehicles_login_required">Sign in to manage your vehicles</h1>
         <p class="text-slate-500 mb-6" data-i18n="vehicles_login_hint">Inicia sesión para registrar y ver tus vehículos.</p>
         <button id="btn-open-login" type="button" class="btn-primary" data-i18n="client_login">Sign in</button>
       </section>
 
-      <section id="vehicles-content" class="hidden w-full max-w-4xl">
-        <div class="mb-6">
-          <h1 class="text-2xl font-bold text-slate-900" data-i18n="vehicles_title">My vehicles</h1>
-          <p class="mt-1 text-sm text-slate-500">Administra tus vehículos y consulta su historial de servicios.</p>
+      <section id="vehicles-content" class="page-wrap hidden w-full max-w-5xl">
+        <div class="page-heading"><div><p class="public-kicker" data-i18n="vehicles_kicker">Tu flota personal</p><h1 data-i18n="vehicles_title">Mis vehículos</h1><p data-i18n="vehicles_intro">Administra tus vehículos y consulta su historial de servicios.</p></div></div>
+        <div class="page-card">
+          <div id="vehicles-grid" class="grid grid-cols-1 gap-4 md:grid-cols-2"></div>
         </div>
-        <div id="vehicles-grid" class="grid grid-cols-1 gap-4 md:grid-cols-2"></div>
       </section>
     </main>
+
+    <footer class="public-footer text-center">&copy; <span data-site-year></span> <span data-site-name></span></footer>
 
     <script src="/shared/i18n.js?v=5"></script>
     <script src="/shared/api.js?v=6"></script>

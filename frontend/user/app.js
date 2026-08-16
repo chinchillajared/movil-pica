@@ -619,13 +619,13 @@ function initStatus() {
     ];
     items.forEach(function (it) {
       var field = document.createElement("div");
-      field.className = "rounded-lg bg-slate-50 px-3 py-2.5";
-      field.innerHTML = "<div class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + htmlEscape(it.label) + "</div><div class='mt-1 break-words text-sm font-semibold text-slate-900'>" + htmlEscape(it.value) + "</div>";
+      field.className = "inline-flex min-h-[46px] items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5";
+     field.innerHTML = "<span class='text-xs font-bold uppercase tracking-wide text-slate-500'>" + htmlEscape(it.label) + "</span><span class='break-words text-sm font-semibold text-slate-900'>" + htmlEscape(it.value) + "</span>";
       if (it.label === t("field_address")) field.className += " sm:col-span-2";
       tagsBox.appendChild(field);
     });
     var statusTag = document.createElement("div");
-    statusTag.className = "flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 sm:col-span-2";
+     statusTag.className = "flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5";
     statusTag.innerHTML = "<span class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + htmlEscape(t("field_status")) + "</span><span class='badge " + statusBadgeClass(a.status) + "'>" + htmlEscape(t(statusKey(a.status))) + "</span>";
     tagsBox.appendChild(statusTag);
     currentAppt = a;
@@ -728,7 +728,7 @@ function initVehicles() {
 
   function buildVehicleCard(v) {
     var card = document.createElement("div");
-    card.className = "group relative flex min-h-[250px] flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-100 hover:shadow-md";
+     card.className = "vehicle-card relative flex min-h-[250px] flex-col";
 
     var menuWrap = document.createElement("div");
     menuWrap.className = "absolute top-2 right-2 z-10";
@@ -771,7 +771,7 @@ function initVehicles() {
     card.appendChild(menuWrap);
 
     var photoBanner = document.createElement("div");
-    photoBanner.className = "mx-auto mb-1 mt-1 aspect-square w-full max-w-[220px] overflow-hidden rounded-xl border border-slate-200 bg-slate-100";
+     photoBanner.className = "vehicle-card-photo mx-auto mb-1 mt-1 aspect-square w-full max-w-[220px] overflow-hidden";
     var photo = document.createElement("img");
     photo.src = v.front_photo || "/icons/car.svg";
     photo.alt = v.plate;
@@ -781,24 +781,27 @@ function initVehicles() {
 
     var info = document.createElement("div");
     info.className = "mt-4 flex flex-1 flex-col";
+    function vehicleTag(label, value) {
+      var tag = document.createElement("span");
+       tag.className = "vehicle-info-tag inline-flex w-fit items-center gap-1.5 rounded-lg px-3 py-2 text-sm";
+      tag.innerHTML = "<span class='font-bold text-slate-800'>" + esc(label) + "</span><span class='text-slate-600'>" + esc(value == null || value === "" ? "—" : value) + "</span>";
+      return tag;
+    }
     var title = document.createElement("div");
-    title.className = "pr-8 text-base font-bold text-slate-900";
+     title.className = "vehicle-card-title pr-8 text-base font-bold";
     title.textContent = [v.make, v.model].filter(Boolean).join(" ") || t("vehicles_title");
     info.appendChild(title);
-    var plate = document.createElement("div");
-    plate.className = "mt-0.5 text-sm font-semibold uppercase tracking-wide text-brand-700";
-    plate.textContent = v.plate || "—";
-    info.appendChild(plate);
+    var vehicleTags = document.createElement("div");
+     vehicleTags.className = "vehicle-info-tags mt-3 flex flex-col items-start gap-2";
+    vehicleTags.appendChild(vehicleTag(t("vehicles_plate"), v.plate || "—"));
     var items = [
+      { label: t("vehicles_engine"), value: v.engine || "—" },
       { label: t("vehicles_year"), value: v.year != null ? v.year : "—" },
-      { label: t("vehicles_color"), value: v.color || "—" },
     ];
     items.forEach(function (it) {
-      var tag = document.createElement("span");
-      tag.className = "mt-2 text-sm text-slate-500";
-      tag.innerHTML = "<span class='font-medium text-slate-700'>" + esc(it.label) + ":</span> " + esc(it.value);
-      info.appendChild(tag);
+      vehicleTags.appendChild(vehicleTag(it.label, it.value));
     });
+    info.appendChild(vehicleTags);
     card.appendChild(info);
 
     var repairsBtn = document.createElement("a");
@@ -816,7 +819,7 @@ function initVehicles() {
   function buildAddTile() {
     var tile = document.createElement("button");
     tile.type = "button";
-    tile.className = "btn-square min-h-[250px] flex-col items-center justify-center border-dashed text-center shadow-none";
+     tile.className = "vehicle-add-tile flex min-h-[250px] flex-col items-center justify-center text-center";
     tile.innerHTML = "<span class='flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-2xl font-medium text-brand-700'>+</span><span class='text-sm font-semibold text-slate-700'>" + esc(t("vehicles_add")) + "</span>";
     tile.addEventListener("click", function () { openVehicleModal(null); });
     return tile;
@@ -839,12 +842,12 @@ function initVehicles() {
             '<input id="v-plate" type="text" required class="field-input uppercase" value="' + esc(vehicle ? vehicle.plate : "") + '" placeholder="' + esc(t("placeholder_plate")) + '" /></div>' +
           '<div><label class="field-label" for="v-make">' + esc(t("vehicles_make")) + '</label>' +
             '<input id="v-make" type="text" required class="field-input" value="' + esc(vehicle ? vehicle.make : "") + '" placeholder="' + esc(t("vehicles_make_ph")) + '" /></div>' +
-          '<div><label class="field-label" for="v-model">' + esc(t("vehicles_model")) + '</label>' +
-            '<input id="v-model" type="text" required class="field-input" value="' + esc(vehicle ? vehicle.model : "") + '" placeholder="' + esc(t("vehicles_model_ph")) + '" /></div>' +
+           '<div><label class="field-label" for="v-model">' + esc(t("vehicles_model")) + '</label>' +
+             '<input id="v-model" type="text" required class="field-input" value="' + esc(vehicle ? vehicle.model : "") + '" placeholder="' + esc(t("vehicles_model_ph")) + '" /></div>' +
+           '<div><label class="field-label" for="v-engine">' + esc(t("vehicles_engine")) + '</label>' +
+             '<input id="v-engine" type="text" class="field-input" value="' + esc(vehicle ? vehicle.engine || "" : "") + '" placeholder="' + esc(t("vehicles_engine_ph")) + '" /></div>' +
           '<div><label class="field-label" for="v-year">' + esc(t("vehicles_year")) + '</label>' +
             '<input id="v-year" type="number" min="1900" max="2200" class="field-input" value="' + (vehicle && vehicle.year ? vehicle.year : "") + '" placeholder="' + esc(t("vehicles_year_ph")) + '" /></div>' +
-          '<div class="sm:col-span-2"><label class="field-label" for="v-color">' + esc(t("vehicles_color")) + '</label>' +
-            '<input id="v-color" type="text" class="field-input" value="' + esc(vehicle ? vehicle.color : "") + '" placeholder="' + esc(t("vehicles_color_ph")) + '" /></div>' +
           '<div class="sm:col-span-2"><label class="field-label">' + esc(t("vehicles_photo")) + '</label>' +
             '<div class="flex items-center gap-3">' +
               '<img id="v-photo-preview" alt="" class="hidden h-20 w-28 object-cover rounded-lg border border-slate-200 bg-white" />' +
@@ -884,7 +887,7 @@ function initVehicles() {
       input.style.display = "none";
       document.body.appendChild(input);
       input.addEventListener("change", function () {
-        fileToDataURL(input, 3 * 1024 * 1024, function (dataUrl) {
+        fileToDataURL(input, 10 * 1024 * 1024, function (dataUrl) {
           photoDataUrl = dataUrl;
           preview.src = dataUrl;
           preview.classList.remove("hidden");
@@ -899,8 +902,8 @@ function initVehicles() {
       var plate = form.querySelector("#v-plate").value.trim().toUpperCase();
       var make = form.querySelector("#v-make").value.trim();
       var model = form.querySelector("#v-model").value.trim();
+      var engine = form.querySelector("#v-engine").value.trim();
       var yearVal = form.querySelector("#v-year").value.trim();
-      var color = form.querySelector("#v-color").value.trim();
       if (!plate || !make || !model) {
         err.textContent = t("error_required");
         err.classList.remove("hidden");
@@ -911,8 +914,8 @@ function initVehicles() {
         plate: plate,
         make: make,
         model: model,
+        engine: engine,
         year: yearVal ? parseInt(yearVal, 10) : null,
-        color: color,
         front_photo: photoDataUrl || (vehicle ? vehicle.front_photo || "" : ""),
       };
       var promise = editing
@@ -940,15 +943,56 @@ function initVehicles() {
 }
 
 function fileToDataURL(input, maxBytes, onChange) {
+  var targetBytes = 500 * 1024;
   var file = input.files && input.files[0];
   if (!file) return;
   if (maxBytes && file.size > maxBytes) {
-    showMessage("La imagen es demasiado grande (máx 3MB).");
+    showMessage(window.I18N.t("image_too_large"));
     input.value = "";
     return;
   }
   var reader = new FileReader();
-  reader.onload = function () { onChange(reader.result); };
+  reader.onload = function () {
+    var source = reader.result;
+    if (file.size <= targetBytes) {
+      onChange(source);
+      return;
+    }
+    var image = new Image();
+    image.onload = function () {
+      var width = image.naturalWidth || image.width;
+      var height = image.naturalHeight || image.height;
+      var maxDimension = 1600;
+      if (Math.max(width, height) > maxDimension) {
+        var scale = maxDimension / Math.max(width, height);
+        width = Math.max(1, Math.round(width * scale));
+        height = Math.max(1, Math.round(height * scale));
+      }
+      var canvas = document.createElement("canvas");
+      var ctx = canvas.getContext("2d");
+      var result = "";
+      for (var attempt = 0; attempt < 8; attempt++) {
+        canvas.width = width;
+        canvas.height = height;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(image, 0, 0, width, height);
+        for (var quality = 0.82; quality >= 0.18; quality -= 0.08) {
+          result = canvas.toDataURL("image/jpeg", quality);
+          if (result.length * 0.75 <= targetBytes) {
+            onChange(result);
+            return;
+          }
+        }
+        width = Math.max(320, Math.round(width * 0.75));
+        height = Math.max(320, Math.round(height * 0.75));
+      }
+      if (result && result.length * 0.75 <= targetBytes) onChange(result);
+      else showMessage(window.I18N.t("image_processing_error"));
+    };
+    image.onerror = function () { showMessage(window.I18N.t("image_processing_error")); };
+    image.src = source;
+  };
   reader.onerror = function () { input.value = ""; };
   reader.readAsDataURL(file);
 }
@@ -974,7 +1018,59 @@ function setupAuthPage(contentId) {
 
 function buildAppointmentCard(a, t) {
   var card = document.createElement("div");
-  card.className = "rounded-xl border border-slate-200 bg-white p-4";
+  card.className = "relative rounded-xl border border-slate-200 bg-white p-4";
+  if (a.status !== "cancelled" && a.status !== "completed") {
+    var menuWrap = document.createElement("div");
+    menuWrap.className = "absolute right-3 top-3 z-10";
+    var gearBtn = document.createElement("button");
+    gearBtn.type = "button";
+    gearBtn.className = "rounded-lg border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700";
+    gearBtn.innerHTML = '<img class="h-4 w-4" src="/icons/gear.svg" alt="" />';
+    var menu = document.createElement("div");
+    menu.className = "absolute right-0 top-full mt-1 hidden min-w-[150px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg";
+    var editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50";
+    editBtn.textContent = t("btn_edit_appt");
+    var cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50";
+    cancelBtn.textContent = t("btn_cancel_appt");
+    menu.appendChild(editBtn);
+    menu.appendChild(cancelBtn);
+    function closeMenu() { menu.classList.add("hidden"); document.removeEventListener("click", outside); }
+    function outside(e) { if (!menuWrap.contains(e.target)) closeMenu(); }
+    gearBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      menu.classList.toggle("hidden");
+      if (menu.classList.contains("hidden")) document.removeEventListener("click", outside);
+      else setTimeout(function () { document.addEventListener("click", outside); }, 0);
+    });
+    editBtn.addEventListener("click", function () {
+      var params = new URLSearchParams({ edit: a.appointment_number, phone: a.phone, plate: a.plate });
+      location.href = "/user/schedule.html?" + params.toString();
+    });
+    cancelBtn.addEventListener("click", function () {
+      showConfirm(t("cancel_confirm")).then(function (ok) {
+        if (!ok) return;
+        cancelBtn.disabled = true;
+        window.API.public.cancelAppointment(a.appointment_number, { phone: a.phone, plate: a.plate }).then(function () {
+          var listEl = card.parentElement;
+          card.remove();
+          if (listEl && !listEl.children.length) {
+            var emptyEl = document.getElementById("appointments-empty");
+            if (emptyEl) emptyEl.classList.remove("hidden");
+          }
+        }).catch(function (err) {
+          cancelBtn.disabled = false;
+          showMessage(err.message || t("error_generic"));
+        });
+      });
+    });
+    menuWrap.appendChild(gearBtn);
+    menuWrap.appendChild(menu);
+    card.appendChild(menuWrap);
+  }
   var head = document.createElement("div");
   head.className = "flex flex-wrap items-center gap-2";
   var num = document.createElement("span");
@@ -998,27 +1094,25 @@ function buildAppointmentCard(a, t) {
 
 function buildRepairCard(r, t) {
   var card = document.createElement("div");
-  card.className = "rounded-xl border border-slate-200 bg-white p-5 shadow-sm";
+   card.className = "repair-card rounded-2xl p-5";
 
   var top = document.createElement("div");
   top.className = "flex flex-wrap items-start justify-between gap-3";
   var left = document.createElement("div");
   left.className = "min-w-0";
-  var sym = (r.price_rows && r.price_rows.length) ? currencySymbol(r.price_rows[0].currency || "CRC") : "₡";
-  left.innerHTML =
-    "<div class='flex flex-wrap items-center gap-2'>" +
-      "<span class='text-base font-bold text-slate-900'>" + htmlEscape(r.title || "—") + "</span>" +
-       "<span class='badge badge-completed font-semibold'>" + htmlEscape(t("services_total") + ": " + sym + " " + formatMoney(r.total)) + "</span>" +
-    "</div>";
+   left.innerHTML =
+       "<div class='flex flex-wrap items-center gap-2'>" +
+       "<span class='text-base font-bold text-slate-900'>" + htmlEscape(r.title || "—") + "</span>" +
+       "</div>";
   var metaTags = document.createElement("div");
-  metaTags.className = "mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2";
+   metaTags.className = "mt-3 flex flex-wrap gap-2";
   [
     { label: t("field_date"), value: formatAppDate(String(r.created_at || "").slice(0, 10)) },
     { label: t("services_mileage"), value: r.mileage != null ? r.mileage + " " + (r.mileage_unit || "km") : "—" },
   ].forEach(function (it) {
     var field = document.createElement("div");
-    field.className = "rounded-lg bg-slate-50 px-3 py-2";
-    field.innerHTML = "<span class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + htmlEscape(it.label) + "</span><div class='mt-0.5 font-semibold text-slate-800'>" + htmlEscape(String(it.value)) + "</div>";
+     field.className = "repair-meta-tag inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm";
+     field.innerHTML = "<span class='font-bold text-slate-800'>" + htmlEscape(it.label) + "</span><span class='text-slate-600'>" + htmlEscape(String(it.value)) + "</span>";
     metaTags.appendChild(field);
   });
   left.appendChild(metaTags);
@@ -1042,7 +1136,7 @@ function openRepairDetailModal(r, t) {
   var overlay = document.createElement("div");
   overlay.className = "fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4";
   var box = document.createElement("div");
-  box.className = "my-8 w-full max-w-xl rounded-2xl bg-white shadow-2xl";
+  box.className = "service-detail-modal my-8 w-full max-w-xl rounded-2xl bg-white shadow-2xl";
   box.innerHTML =
     '<div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">' +
       '<h3 class="text-lg font-bold text-slate-800"></h3>' +
@@ -1062,39 +1156,56 @@ function openRepairDetailModal(r, t) {
     body.appendChild(diagnosis);
   }
   if (r.price_rows && r.price_rows.length) body.appendChild(buildServicePriceTable(r.price_rows, t));
-  if (r.other_photos && r.other_photos.length) body.appendChild(photoStrip(t("services_other_photos"), r.other_photos));
+  if (r.other_photos && r.other_photos.length) body.appendChild(photoStrip(t("services_client_photos"), r.other_photos));
   document.body.appendChild(overlay);
 }
 
 function buildServicePriceTable(rows, t) {
   var wrap = document.createElement("div");
-  wrap.className = "overflow-hidden rounded-lg border border-slate-200 bg-white";
+  wrap.className = "overflow-hidden rounded-xl border border-slate-200 bg-white";
+  var heading = document.createElement("div");
+  heading.className = "border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-800";
+  heading.textContent = t("services_prices_title");
+  wrap.appendChild(heading);
+
   var table = document.createElement("table");
-  table.className = "w-full text-sm";
-  var thead = document.createElement("thead");
-  var hr = document.createElement("tr");
-  hr.className = "bg-slate-50 text-slate-500";
-  hr.innerHTML =
-    "<th class='text-left px-3 py-2 font-semibold rounded-l-lg'>" + htmlEscape(t("services_price_type")) + "</th>" +
-    "<th class='text-left px-3 py-2 font-semibold'>" + htmlEscape(t("services_price_description")) + "</th>" +
-    "<th class='text-right px-3 py-2 font-semibold rounded-r-lg'>" + htmlEscape(t("services_price_amount")) + "</th>";
-  thead.appendChild(hr);
-  table.appendChild(thead);
+  table.className = "service-price-table w-full text-sm";
+  table.innerHTML =
+    "<thead class='bg-white text-slate-500'><tr>" +
+      "<th class='service-price-type px-4 py-2 text-left font-semibold'>" + htmlEscape(t("services_price_type")) + "</th>" +
+      "<th class='service-price-description px-4 py-2 text-left font-semibold'>" + htmlEscape(t("services_price_description")) + "</th>" +
+      "<th class='service-price-amount px-4 py-2 text-right font-semibold'>" + htmlEscape(t("services_price_amount")) + "</th>" +
+    "</tr></thead>";
   var tbody = document.createElement("tbody");
+  var totals = {};
   rows.forEach(function (row) {
-    var amt = row.amount != null && row.amount !== "" ? Number(row.amount) : 0;
-    var kindLabel = row.kind === "parts" ? t("services_price_parts") : t("services_price_labor");
-    var kindCls = row.kind === "parts" ? "bg-blue-100 text-blue-800" : "bg-emerald-100 text-emerald-800";
+    var currency = row.currency || "CRC";
+    var amount = row.amount != null && row.amount !== "" ? Number(row.amount) : 0;
+    if (!totals[currency]) totals[currency] = { labor: 0, parts: 0 };
+    if (row.kind === "parts") totals[currency].parts += amount;
+    else totals[currency].labor += amount;
     var tr = document.createElement("tr");
     tr.className = "border-t border-slate-100";
+    var kind = row.kind === "parts" ? t("services_price_parts") : t("services_price_labor");
     tr.innerHTML =
-      "<td class='px-3 py-2'><span class='text-xs font-semibold px-2 py-0.5 rounded-full " + kindCls + "'>" + htmlEscape(kindLabel) + "</span></td>" +
-      "<td class='px-3 py-2 text-slate-700'>" + htmlEscape(row.description || "—") + "</td>" +
-      "<td class='px-3 py-2 text-right font-medium text-slate-800'>" + htmlEscape(currencySymbol(row.currency || "CRC") + " " + formatMoney(amt)) + "</td>";
+      "<td class='service-price-type px-4 py-3'><span class='service-price-kind rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700'>" + htmlEscape(kind) + "</span></td>" +
+      "<td class='service-price-description px-4 py-3 text-slate-700'>" + htmlEscape(row.description || "—") + "</td>" +
+      "<td class='service-price-amount px-4 py-3 text-right font-semibold text-slate-800'>" + htmlEscape(currencySymbol(currency) + " " + formatMoney(amount)) + "</td>";
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
   wrap.appendChild(table);
+
+  var totalsBox = document.createElement("div");
+  totalsBox.className = "flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3";
+  Object.keys(totals).forEach(function (currency) {
+    var symbol = currencySymbol(currency);
+    var total = totals[currency];
+    totalsBox.appendChild(buildInfoTag(t("services_total_labor"), symbol + " " + formatMoney(total.labor)));
+    totalsBox.appendChild(buildInfoTag(t("services_total_parts"), symbol + " " + formatMoney(total.parts)));
+    totalsBox.appendChild(buildInfoTag(t("services_total"), symbol + " " + formatMoney(total.labor + total.parts)));
+  });
+  wrap.appendChild(totalsBox);
   return wrap;
 }
 
@@ -1154,14 +1265,27 @@ function viewPhoto(src) {
   document.body.appendChild(overlay);
 }
 
-function initGarage() {
-  var showLoggedIn = setupAuthPage("garage-content");
-  window.API.auth.me().then(function () {
-    showLoggedIn(true);
+function initAccount() {
+  var loginRequired = $("login-required");
+  var content = $("account-content");
+  var name = $("account-client-name");
+  var openLoginBtn = $("btn-open-login");
+  if (openLoginBtn && window.ClientAuth) {
+    openLoginBtn.addEventListener("click", function () { window.ClientAuth.openLogin(); });
+  }
+  function showLoggedIn(state, client) {
+    if (loginRequired) loginRequired.classList.toggle("hidden", state);
+    if (content) content.classList.toggle("hidden", !state);
+    if (name && client) name.textContent = client.first_name || "";
+  }
+  window.API.auth.me().then(function (client) {
+    showLoggedIn(true, client);
   }).catch(function () {
     showLoggedIn(false);
   });
-  document.addEventListener("client:login", function () { showLoggedIn(true); });
+  document.addEventListener("client:login", function (event) {
+    showLoggedIn(true, event.detail);
+  });
 }
 
 function initAppointments() {
@@ -1175,6 +1299,7 @@ function initAppointments() {
     if (empty) empty.classList.add("hidden");
     window.API.auth.listAppointments().then(function (appts) {
       showLoggedIn(true);
+      appts = (appts || []).filter(function (a) { return a.status !== "cancelled"; });
       if (!appts || !appts.length) {
         if (empty) empty.classList.remove("hidden");
         return;
@@ -1214,7 +1339,7 @@ function initRepairs() {
     tagsBox.classList.remove("hidden");
     tagsBox.innerHTML = "";
     var summary = document.createElement("div");
-    summary.className = "rounded-xl border border-slate-200 bg-white p-4 shadow-sm";
+     summary.className = "vehicle-summary rounded-2xl p-4";
     var summaryInner = document.createElement("div");
     summaryInner.className = "flex flex-col gap-4 sm:flex-row sm:items-center";
     if (v.front_photo) {
@@ -1230,13 +1355,13 @@ function initRepairs() {
       { label: t("vehicles_plate"), value: v.plate },
       { label: t("vehicles_make"), value: v.make || "—" },
       { label: t("vehicles_model"), value: v.model || "—" },
+      { label: t("vehicles_engine"), value: v.engine || "—" },
       { label: t("vehicles_year"), value: v.year != null ? v.year : "—" },
-      { label: t("vehicles_color"), value: v.color || "—" },
     ];
     items.forEach(function (it) {
       var field = document.createElement("div");
-      field.className = "rounded-lg bg-slate-50 px-3 py-2";
-      field.innerHTML = "<div class='text-xs font-semibold uppercase tracking-wide text-slate-500'>" + htmlEscape(it.label) + "</div><div class='mt-0.5 text-sm font-semibold text-slate-900'>" + htmlEscape(it.value) + "</div>";
+      field.className = "vehicle-summary-tag inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-sm";
+     field.innerHTML = "<span class='font-bold text-slate-800'>" + htmlEscape(it.label) + "</span><span class='text-slate-600'>" + htmlEscape(it.value) + "</span>";
       summaryInfo.appendChild(field);
     });
     summaryInner.appendChild(summaryInfo);
@@ -1271,13 +1396,102 @@ function initRepairs() {
   document.addEventListener("client:login", load);
 }
 
+function getHomepageValue(source, path) {
+  return path.split(".").reduce(function (value, key) {
+    return value == null ? undefined : value[key];
+  }, source);
+}
+
+function applyHomeSettings(data) {
+  if (window.PAGE !== "home" || !data) return;
+  var lang = window.I18N && window.I18N.lang === "en" ? "en" : "es";
+  var content = data.homepage_content || {};
+  var localeContent = {};
+  Object.keys(content).forEach(function (section) {
+    if (section === "services" && content.services) {
+      localeContent.services = Object.assign({}, content.services, content.services[lang], {
+        cards: (content.services.cards || []).map(function (card) { return card[lang] || {}; }),
+      });
+    } else if (content[section] && content[section][lang]) {
+      localeContent[section] = content[section][lang];
+    }
+  });
+  document.querySelectorAll("[data-home-field]").forEach(function (el) {
+    var value = getHomepageValue(localeContent, el.getAttribute("data-home-field"));
+    if (value != null && typeof value !== "object") el.textContent = String(value);
+  });
+
+  var layout = data.homepage_layout || {};
+  var main = document.querySelector(".public-main");
+  var sections = {};
+  document.querySelectorAll("[data-home-section]").forEach(function (section) {
+    sections[section.getAttribute("data-home-section")] = section;
+  });
+  var visibility = layout.section_visibility || {};
+  Object.keys(sections).forEach(function (name) {
+    sections[name].classList.toggle("hidden", visibility[name] === false);
+  });
+  if (main && Array.isArray(layout.section_order)) {
+    layout.section_order.forEach(function (name) {
+      if (sections[name]) main.appendChild(sections[name]);
+    });
+  }
+  var sizes = layout.sizes || {};
+  if (sections.hero && sizes.hero_min_height) sections.hero.style.minHeight = sizes.hero_min_height + "px";
+  document.querySelectorAll(".home-section").forEach(function (section) {
+    if (sizes.section_padding) {
+      section.style.paddingTop = sizes.section_padding + "px";
+      section.style.paddingBottom = sizes.section_padding + "px";
+    }
+  });
+  document.querySelectorAll(".service-card-image").forEach(function (image) {
+    if (sizes.service_card_image_height) image.style.height = sizes.service_card_image_height + "px";
+  });
+  document.querySelectorAll(".home-cta").forEach(function (cta) {
+    if (sizes.cta_padding) {
+      cta.style.paddingTop = sizes.cta_padding + "px";
+      cta.style.paddingBottom = sizes.cta_padding + "px";
+    }
+  });
+
+  var images = data.background_images || [];
+  var imageIndices = layout.image_indices || {};
+  var heroIndex = Number.isInteger(imageIndices.hero) ? imageIndices.hero : 0;
+  var hero = document.querySelector("[data-home-hero-image]");
+  if (hero && images[heroIndex]) hero.style.backgroundImage = "url(\"" + images[heroIndex] + "\")";
+  var serviceIndices = Array.isArray(imageIndices.services) ? imageIndices.services : [];
+  document.querySelectorAll("[data-service-image]").forEach(function (el, position) {
+    var index = Number.isInteger(serviceIndices[position]) ? serviceIndices[position] : position;
+    var src = images[index];
+    if (!src) return;
+    el.classList.add("has-image");
+    el.style.backgroundImage = "url(\"" + src + "\")";
+  });
+}
+
+function wireHistoryBackButtons() {
+  document.querySelectorAll("[data-history-back]").forEach(function (button) {
+    if (button.dataset.historyWired) return;
+    button.dataset.historyWired = "true";
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      if (document.referrer && document.referrer.indexOf(window.location.origin) === 0 && window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = "/user/";
+      }
+    });
+  });
+}
+
 document.addEventListener("i18n:ready", () => {
   if (window.__initDone) return;
   window.__initDone = true;
+  wireHistoryBackButtons();
   if (window.PAGE === "schedule") initSchedule();
   if (window.PAGE === "status") initStatus();
   if (window.PAGE === "vehicles") initVehicles();
-  if (window.PAGE === "garage") initGarage();
+  if (window.PAGE === "account") initAccount();
   if (window.PAGE === "appointments") initAppointments();
   if (window.PAGE === "repairs") initRepairs();
   if (window.ClientAuth) {
@@ -1293,6 +1507,8 @@ document.addEventListener("i18n:ready", () => {
     if (window.setupScheduleVehicleSelector) window.setupScheduleVehicleSelector();
   });
   loadAnnouncement();
+  applyHomeSettings(window.siteBrandingData);
+  document.addEventListener("site:branding", function (event) { applyHomeSettings(event.detail); });
   var es = new EventSource("/api/events/stream");
   es.addEventListener("announcement", function () { loadAnnouncement(); });
   es.addEventListener("appointment", function () {
@@ -1306,6 +1522,10 @@ document.addEventListener("i18n:ready", () => {
   es.addEventListener("settings", function () {
     if (window.refreshScheduleCalendar) window.refreshScheduleCalendar();
   });
+});
+
+document.addEventListener("i18n:ready", function () {
+  if (window.__initDone) applyHomeSettings(window.siteBrandingData);
 });
 
 async function loadAnnouncement() {
