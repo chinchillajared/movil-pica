@@ -89,6 +89,10 @@ docker compose up -d        # start services
   concatenation). Add rate limiting to new endpoints (`rate_limit(...)`).
 - **Frontend:** vanilla JavaScript, no frameworks. Page-specific logic lives in
   `user/app.js` and `mechanic/app.js` and dispatches on `window.PAGE`.
+- **Public authentication UI:** `frontend/shared/auth.js` injects the header
+  controls into every `[data-auth-ui]` slot. Authenticated clients see the
+  **Mi cuenta** link and gear menu on every public page; unauthenticated clients
+  see the login/register button and gear menu.
 - **UI:** use Tailwind utility classes and the shared component classes defined
   in `frontend/src/input.css` (`btn-primary`, `btn-secondary`, `card`,
   `field-input`, `badge-*`, …). Keep the design consistent across pages.

@@ -179,8 +179,7 @@
       host.innerHTML = "";
       var loggedIn = isLoggedIn();
       if (loggedIn) {
-        var accountHome = window.location.pathname === "/user/" || window.location.pathname === "/user/index.html";
-        if (accountHome) host.appendChild(buildHeaderAction("/user/account.html", "account_nav", "person.svg"));
+        host.appendChild(buildHeaderAction("/user/account.html", "account_nav", "person.svg"));
       } else {
         var btn = document.createElement("button");
         btn.type = "button";
