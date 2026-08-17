@@ -246,7 +246,7 @@ class SiteSettings(Base):
 
     id = Column(Integer, primary_key=True)
     site_name = Column(String(200), nullable=False, server_default="")
-    site_title = Column(String(200), nullable=False, server_default="Mecánico móvil")
+    site_title = Column(String(200), nullable=False, server_default="Mecánico en Cóbano")
     site_tagline = Column(String(300), nullable=False, server_default="Diagnóstico, mantenimiento y reparacion automotriz")
     background_images = Column(Text, nullable=False, server_default="[]")
     background_image_count = Column(Integer, nullable=False, server_default="3")

@@ -461,7 +461,7 @@ def get_site_settings(db: Session) -> models.SiteSettings:
         obj = models.SiteSettings(
             id=1,
             site_name="",
-            site_title="Mecánico móvil",
+            site_title="Mecánico en Cóbano",
             site_tagline="Diagnóstico, mantenimiento y reparacion automotriz",
             background_images="[]",
             background_image_count=3,

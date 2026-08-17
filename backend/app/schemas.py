@@ -514,7 +514,7 @@ class BootstrapStatus(BaseModel):
 class AdminSetup(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     site_name: str = Field(..., min_length=1, max_length=200)
-    site_title: str = Field(default="Mecánico móvil", min_length=1, max_length=200)
+    site_title: str = Field(default="Mecánico en Cóbano", min_length=1, max_length=200)
     email: str
     password: str = Field(..., min_length=_PASSWORD_MIN, max_length=128)
     logo_data_url: str = Field(default="", max_length=20000000)
@@ -650,7 +650,7 @@ class HomepageLayout(HomepageModel):
 
 class SiteSettingsOut(BaseModel):
     site_name: str = ""
-    site_title: str = "Mecánico móvil"
+    site_title: str = "Mecánico en Cóbano"
     site_tagline: str = "Diagnóstico, mantenimiento y reparacion automotriz"
     background_images: list[str] = Field(default_factory=list)
     background_image_count: int = 3

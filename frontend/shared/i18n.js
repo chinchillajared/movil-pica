@@ -194,8 +194,8 @@ async function applySiteBranding() {
     data = {};
   }
   const logo = data.logo_data_url || "";
-  const siteName = data.site_name || "Mecánico móvil";
-  const siteTitle = data.site_title || "Mecánico móvil";
+  const siteName = data.site_name || "Mecánico en Cóbano";
+  const siteTitle = data.site_title || "Mecánico en Cóbano";
   const siteTagline = data.site_tagline || "Diagnóstico, mantenimiento y reparacion automotriz";
   const logoWidth = Number(data.logo_width) || 160;
   const logoHeight = Number(data.logo_height) || 64;

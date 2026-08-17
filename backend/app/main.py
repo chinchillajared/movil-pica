@@ -154,7 +154,7 @@ def on_startup() -> None:
                 "CREATE TABLE IF NOT EXISTS site_settings ("
                 "id INTEGER PRIMARY KEY, "
                 "site_name VARCHAR(200) NOT NULL DEFAULT '', "
-                "site_title VARCHAR(200) NOT NULL DEFAULT 'Mecánico móvil', "
+                "site_title VARCHAR(200) NOT NULL DEFAULT 'Mecánico en Cóbano', "
                 "site_tagline VARCHAR(300) NOT NULL DEFAULT 'Diagnóstico, mantenimiento y reparacion automotriz', "
                 "background_images TEXT NOT NULL DEFAULT '[]', "
                 "background_image_count INTEGER NOT NULL DEFAULT 3, "
@@ -178,7 +178,7 @@ def on_startup() -> None:
         conn.execute(
             text(
                 "ALTER TABLE site_settings "
-                "ADD COLUMN IF NOT EXISTS site_title VARCHAR(200) NOT NULL DEFAULT 'Mecánico móvil'"
+                "ADD COLUMN IF NOT EXISTS site_title VARCHAR(200) NOT NULL DEFAULT 'Mecánico en Cóbano'"
             )
         )
         conn.execute(

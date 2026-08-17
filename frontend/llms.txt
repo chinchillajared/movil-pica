@@ -1,8 +1,8 @@
-# Mecánico móvil
+# Mecánico en Cóbano
 
-> Servicio de mecánica a domicilio para vehículos en Cóbano, Santa Teresa y alrededores, Costa Rica.
+> Mecánico a domicilio para vehículos en Cóbano, Santa Teresa, Mal País, Montezuma y alrededores, Costa Rica.
 
-Mecánico móvil ofrece diagnóstico automotriz, mantenimiento y reparaciones con atención a domicilio. Las personas pueden revisar los servicios disponibles y agendar una cita en línea indicando la fecha, hora, vehículo y ubicación.
+Mecánico en Cóbano ofrece diagnóstico automotriz, mantenimiento y reparaciones con atención a domicilio en Cóbano y alrededores. Las personas pueden revisar los servicios disponibles y agendar una cita en línea indicando la fecha, hora, vehículo y ubicación.
 
 ## Sitio público
 
@@ -13,7 +13,9 @@ Mecánico móvil ofrece diagnóstico automotriz, mantenimiento y reparaciones co
 
 - Cóbano
 - Santa Teresa
-- Alrededores de Cóbano y Santa Teresa
+- Mal País
+- Montezuma
+- Alrededores de Cóbano
 
 ## Servicios
 
