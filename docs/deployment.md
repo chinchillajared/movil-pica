@@ -75,7 +75,8 @@ After pgAdmin loads:
 - **Indexing**: the public homepage and appointment booking page are indexable.
   Account, appointment history, vehicle history, status lookup and mechanic
   panel pages are marked `noindex`; the API and mechanic routes are restricted
-  in `robots.txt`.
+  in `robots.txt`. The homepage aliases `/user`, `/user/` and
+  `/user/index.html` redirect to `/` so the homepage has one canonical URL.
 - **Search Console**: after deployment, submit `${SITE_URL}/sitemap.xml` in
   Google Search Console and verify that `${SITE_URL}/robots.txt` is accessible.
 - **Gmail integration**: configure `SITE_URL` to the public base URL and set up

@@ -12,6 +12,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/shared /usr/share/nginx/html/shared
 COPY --from=builder /app/locales /usr/share/nginx/html/locales
 COPY --from=builder /app/user /usr/share/nginx/html/user
+COPY --from=builder /app/user/index.html /usr/share/nginx/html/index.html
 COPY --from=builder /app/mechanic /usr/share/nginx/html/mechanic
 COPY --from=builder /app/icons /usr/share/nginx/html/icons
 COPY robots.txt sitemap.xml llms.txt /usr/share/nginx/html/
