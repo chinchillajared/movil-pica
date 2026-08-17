@@ -4737,13 +4737,36 @@ function saveWhatsapp() {
    ================================================================ */
 
 function attachLandingButtonListeners() {
+  var sidebar = $("app-sidebar");
+  var sidebarToggle = $("sidebar-toggle");
+  var sidebarClose = $("sidebar-close");
+  var sidebarBackdrop = $("sidebar-backdrop");
+
+  function setSidebarOpen(isOpen) {
+    if (!sidebar) return;
+    sidebar.classList.toggle("-translate-x-full", !isOpen);
+    if (sidebarBackdrop) sidebarBackdrop.classList.toggle("hidden", !isOpen);
+    if (sidebarToggle) {
+      sidebarToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      sidebarToggle.setAttribute("aria-label", isOpen ? "Cerrar menú" : "Abrir menú");
+      sidebarToggle.textContent = isOpen ? "×" : "☰";
+    }
+  }
+
+  function closeSidebar() {
+    setSidebarOpen(false);
+  }
+
+  document.querySelectorAll(".sidebar-link[data-view]").forEach(function (link) {
+    link.addEventListener("click", closeSidebar);
+  });
+
   var homeBtn = $("sidebar-home");
   if (homeBtn) {
     homeBtn.addEventListener("click", function () {
       showView("landing");
       initHomeDashboard();
-      var sidebar = $("app-sidebar");
-      if (sidebar) sidebar.classList.add("-translate-x-full");
+      closeSidebar();
     });
   }
 
@@ -4765,13 +4788,17 @@ function attachLandingButtonListeners() {
   if (createBtn) {
     createBtn.addEventListener("click", function () {
       showView("create");
-      var sidebar = $("app-sidebar");
-      if (sidebar) sidebar.classList.add("-translate-x-full");
+      closeSidebar();
     });
   }
-  var sidebarToggle = $("sidebar-toggle");
-  var sidebar = $("app-sidebar");
-  if (sidebarToggle && sidebar) sidebarToggle.addEventListener("click", function () { sidebar.classList.toggle("-translate-x-full"); });
+  if (sidebarToggle && sidebar) sidebarToggle.addEventListener("click", function () {
+    setSidebarOpen(sidebar.classList.contains("-translate-x-full"));
+  });
+  if (sidebarClose) sidebarClose.addEventListener("click", closeSidebar);
+  if (sidebarBackdrop) sidebarBackdrop.addEventListener("click", closeSidebar);
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") closeSidebar();
+  });
 
   var calendarBtn = $("landing-calendar");
   if (calendarBtn) {

@@ -67,6 +67,17 @@ After pgAdmin loads:
 - **HTTPS**: serve the site behind a TLS-terminating reverse proxy; never expose
   sensitive endpoints over plain HTTP.
 - **CORS**: set `ALLOWED_ORIGINS` to the real public origin(s).
+- **Public URL and SEO**: configure `SITE_URL` to the real public base URL
+  before building the frontend image. The value is injected into canonical
+  links, Open Graph metadata, JSON-LD, `robots.txt`, `sitemap.xml` and
+  `llms.txt`. Do not leave the local `http://localhost:8081` value in a
+  production deployment.
+- **Indexing**: the public homepage and appointment booking page are indexable.
+  Account, appointment history, vehicle history, status lookup and mechanic
+  panel pages are marked `noindex`; the API and mechanic routes are restricted
+  in `robots.txt`.
+- **Search Console**: after deployment, submit `${SITE_URL}/sitemap.xml` in
+  Google Search Console and verify that `${SITE_URL}/robots.txt` is accessible.
 - **Gmail integration**: configure `SITE_URL` to the public base URL and set up
   the OAuth redirect URI (see below).
 - **Emails without Gmail**: `EMAIL_ADDRESS` / `EMAILAPP_PASSWORD` provide a

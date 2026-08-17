@@ -1,16 +1,19 @@
 ﻿<!DOCTYPE html>
-<html lang="en" data-locale-base="/locales">
+<html lang="es" data-locale-base="/locales">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title data-i18n="mechanic_panel">Mechanic panel</title>
+    <title data-i18n="mechanic_panel">Panel del mecánico | Mecánico móvil</title>
+    <meta name="description" content="Panel privado de gestión para Mecánico móvil." />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#0b1628" />
     <link rel="stylesheet" href="/shared/styles.css" />
   </head>
   <body class="app-shell mechanic-shell flex flex-col">
     <header class="app-header">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
-          <button id="sidebar-toggle" type="button" class="rounded-lg border border-slate-200 p-2 text-slate-600 lg:hidden" aria-label="Abrir menú">☰</button>
+          <button id="sidebar-toggle" type="button" class="rounded-lg border border-slate-200 p-2 text-slate-600 lg:hidden" aria-label="Abrir menú" aria-controls="app-sidebar" aria-expanded="false">☰</button>
           <img data-site-logo alt="" class="hidden h-8 w-auto" />
           <div>
             <h1 class="text-lg font-bold text-slate-900" data-i18n="mechanic_panel">Mechanic panel</h1>
@@ -37,8 +40,11 @@
     </header>
 
     <div class="flex flex-1">
-      <aside id="app-sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full border-r border-slate-200 bg-white px-4 py-5 transition-transform lg:static lg:translate-x-0">
-        <div class="mb-6 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Menú principal</div>
+      <aside id="app-sidebar" class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full border-r border-slate-200 bg-white px-4 py-5 transition-transform lg:static lg:translate-x-0" aria-label="Menú principal">
+        <div class="mb-6 flex items-center justify-between px-3">
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Menú principal</span>
+          <button id="sidebar-close" type="button" class="rounded-lg p-2 text-xl leading-none text-slate-300 transition hover:bg-white/10 hover:text-white lg:hidden" aria-label="Cerrar menú">&times;</button>
+        </div>
         <nav class="space-y-1">
           <button id="sidebar-home" data-view="landing" class="sidebar-link active"><img src="/icons/book.svg" class="h-5 w-5" alt="" />Inicio</button>
           <button id="sidebar-calendar" data-view="calendar" class="sidebar-link"><img src="/icons/calendar.svg" class="h-5 w-5" alt="" />Citas</button>
@@ -53,6 +59,7 @@
           <button id="sidebar-settings" data-view="settings" class="sidebar-link"><img src="/icons/gear.svg" class="h-5 w-5" alt="" />Configuración</button>
         </nav>
       </aside>
+      <div id="sidebar-backdrop" class="fixed inset-0 z-30 hidden bg-slate-950/60 lg:hidden" aria-hidden="true"></div>
 
       <main class="flex-1 p-4 sm:p-6">
         <div class="mx-auto flex w-full max-w-6xl flex-col items-center justify-start">

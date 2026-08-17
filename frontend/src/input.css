@@ -58,6 +58,9 @@
   .badge-confirmed { @apply bg-blue-100 text-blue-800; }
   .badge-completed { @apply bg-green-100 text-green-800; }
   .badge-cancelled { @apply bg-red-100 text-red-800; }
+  .appointment-info-tag {
+    @apply inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm;
+  }
 
   .public-header {
     @apply relative z-30 flex min-h-[76px] items-center justify-between gap-4 border-b border-white/10
@@ -774,6 +777,9 @@
   .mechanic-shell #app-sidebar > div {
     @apply text-slate-500;
   }
+  .mechanic-shell #sidebar-close {
+    @apply text-slate-300 hover:bg-white/10 hover:text-white;
+  }
   .mechanic-shell #app-sidebar .sidebar-link {
     @apply text-slate-300 hover:bg-white/10 hover:text-white;
   }
@@ -907,6 +913,24 @@ body {
     flex-wrap: wrap;
     row-gap: 0.75rem;
     padding: 0.75rem 1rem;
+  }
+
+  .mechanic-shell .app-header > div {
+    flex-wrap: nowrap;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .mechanic-shell .app-header > div > div:first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .mechanic-shell .app-header h1 {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .app-header > div:last-child {

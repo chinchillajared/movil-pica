@@ -46,6 +46,9 @@ client management, announcements, settings, and a Gmail email integration.
 - **Workshop overview:** the `Inicio` screen summarizes appointments this week,
   pending confirmations, the next appointment, the weekly agenda, and important
   reminders.
+- **Responsive navigation:** on phones, the mechanic panel keeps the menu button
+  beside the logo, supports an explicit close button, closes after navigation,
+  and closes when tapping outside the sidebar.
 - **Persistent reminders:** mechanics can create reminders from `Inicio` and
   mark them as completed. Reminders are stored per mechanic account in
   PostgreSQL and are available across devices.
@@ -161,6 +164,10 @@ Detailed technical documentation is organized under [`docs/`](docs/):
 | [Configuration](docs/configuration.md) | Environment variables and secrets             |
 | [Deployment](docs/deployment.md)      | Build, run, reset, pgAdmin, production notes    |
 | [Development](docs/development.md)   | Project layout, build steps, conventions        |
+
+The public site also publishes `robots.txt`, `sitemap.xml` and `llms.txt` from
+the frontend container. The homepage is optimized for the mobile mechanic
+service area in Cóbano, Santa Teresa and nearby areas.
 
 ---
 

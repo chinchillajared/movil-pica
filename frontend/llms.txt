@@ -1,0 +1,27 @@
+# Mecánico móvil
+
+> Servicio de mecánica a domicilio para vehículos en Cóbano, Santa Teresa y alrededores, Costa Rica.
+
+Mecánico móvil ofrece diagnóstico automotriz, mantenimiento y reparaciones con atención a domicilio. Las personas pueden revisar los servicios disponibles y agendar una cita en línea indicando la fecha, hora, vehículo y ubicación.
+
+## Sitio público
+
+- [Inicio](http://localhost:8081/): Servicios de mecánica a domicilio, proceso de reserva y área de cobertura.
+- [Agendar una cita](http://localhost:8081/user/schedule.html): Formulario público para seleccionar fecha, hora y ubicación del vehículo.
+
+## Área de servicio
+
+- Cóbano
+- Santa Teresa
+- Alrededores de Cóbano y Santa Teresa
+
+## Servicios
+
+- Cambio de aceite
+- Revisión y servicio del sistema de frenos
+- Afinamiento
+- Diagnóstico automotriz general
+
+## Información para agentes
+
+Usa la portada como fuente principal para describir el negocio y su oferta. El servicio es a domicilio y no debe presentarse como un taller con una dirección física pública. La disponibilidad de citas se consulta en el formulario de reserva y puede cambiar con el tiempo.

@@ -1,9 +1,78 @@
 ﻿<!DOCTYPE html>
-<html lang="en" data-locale-base="/locales">
+<html lang="es" data-locale-base="/locales">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title data-i18n="app_name">Mobile Mechanic</title>
+    <title data-i18n="seo_home_title">Mecánico móvil | Mecánica a domicilio en Cóbano y Santa Teresa</title>
+    <meta name="description" content="Mecánico a domicilio en Cóbano, Santa Teresa y alrededores. Diagnóstico, mantenimiento, frenos, cambio de aceite y reparaciones. Agenda tu cita en línea." />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#0b1628" />
+    <link rel="canonical" href="http://localhost:8081/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_CR" />
+    <meta property="og:title" content="Mecánico móvil | Mecánica a domicilio en Cóbano y Santa Teresa" />
+    <meta property="og:description" content="Servicio de mecánica a domicilio en Cóbano, Santa Teresa y alrededores. Agenda diagnóstico, mantenimiento y reparaciones para tu vehículo." />
+    <meta property="og:url" content="http://localhost:8081/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Mecánico móvil | Mecánica a domicilio en Cóbano y Santa Teresa" />
+    <meta name="twitter:description" content="Servicio de mecánica a domicilio en Cóbano, Santa Teresa y alrededores." />
+    <link rel="describedby" href="/llms.txt" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "http://localhost:8081/#organization",
+            "name": "Mecánico móvil",
+            "url": "http://localhost:8081/",
+            "description": "Servicio de mecánica a domicilio en Cóbano, Santa Teresa y alrededores.",
+            "areaServed": [
+              { "@type": "Place", "name": "Cóbano" },
+              { "@type": "Place", "name": "Santa Teresa" },
+              { "@type": "Place", "name": "Alrededores de Cóbano y Santa Teresa" }
+            ],
+            "knowsAbout": [
+              "Cambio de aceite",
+              "Sistema de frenos",
+              "Afinamiento",
+              "Diagnóstico automotriz",
+              "Mecánica a domicilio"
+            ]
+          },
+          {
+            "@type": "Service",
+            "@id": "http://localhost:8081/#mobile-mechanic-service",
+            "name": "Mecánica a domicilio",
+            "serviceType": "Servicio automotriz a domicilio",
+            "provider": { "@id": "http://localhost:8081/#organization" },
+            "areaServed": [
+              { "@type": "Place", "name": "Cóbano" },
+              { "@type": "Place", "name": "Santa Teresa" },
+              { "@type": "Place", "name": "Alrededores" }
+            ],
+            "hasOfferCatalog": {
+              "@type": "OfferCatalog",
+              "name": "Servicios de mecánica",
+              "itemListElement": [
+                { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Cambio de aceite" } },
+                { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Sistema de frenos" } },
+                { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Afinamiento" } },
+                { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Diagnóstico general" } }
+              ]
+            }
+          },
+          {
+            "@type": "WebSite",
+            "@id": "http://localhost:8081/#website",
+            "url": "http://localhost:8081/",
+            "name": "Mecánico móvil",
+            "inLanguage": "es-CR",
+            "publisher": { "@id": "http://localhost:8081/#organization" }
+          }
+        ]
+      }
+    </script>
     <link rel="stylesheet" href="/shared/styles.css" />
   </head>
   <body class="app-shell flex flex-col">
@@ -40,6 +109,7 @@
             <div class="hero-trust">
               <span data-home-field="hero.trust_1" data-i18n="home_trust_1">Horarios disponibles en línea</span>
               <span data-home-field="hero.trust_2" data-i18n="home_trust_2">Atención personalizada</span>
+              <span data-home-field="hero.service_area" data-i18n="home_service_area">Servicio a domicilio en Cóbano, Santa Teresa y alrededores</span>
             </div>
           </div>
           <div class="hero-visual">

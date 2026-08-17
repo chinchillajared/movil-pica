@@ -1083,11 +1083,17 @@ function buildAppointmentCard(a, t) {
   head.appendChild(badge);
   card.appendChild(head);
   var tags = document.createElement("div");
-  tags.className = "flex flex-wrap justify-center gap-2 mt-2";
-  tags.appendChild(buildInfoTag(t("cal_plate"), a.plate));
-  tags.appendChild(buildInfoTag(t("field_date"), formatAppDate(a.appointment_date)));
-  tags.appendChild(buildInfoTag(t("field_time"), to12h(String(a.appointment_time).slice(0, 5))));
-  if (a.address) tags.appendChild(buildInfoTag(t("field_address"), a.address));
+  tags.className = "mt-3 flex flex-wrap items-center gap-2";
+  [
+    [t("cal_plate"), a.plate],
+    [t("field_date"), formatAppDate(a.appointment_date)],
+    [t("field_time"), to12h(String(a.appointment_time).slice(0, 5))],
+    a.address ? [t("field_address"), a.address] : null,
+  ].filter(Boolean).forEach(function (item) {
+    var tag = buildInfoTag(item[0], item[1]);
+    tag.className = "appointment-info-tag";
+    tags.appendChild(tag);
+  });
   card.appendChild(tags);
   return card;
 }

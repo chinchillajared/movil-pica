@@ -1,5 +1,7 @@
 {
   "app_name": "Mecánico móvil",
+  "seo_home_title": "Mecánico móvil | Mecánica a domicilio en Cóbano y Santa Teresa",
+  "seo_schedule_title": "Agendar mecánico a domicilio en Cóbano y Santa Teresa | Mecánico móvil",
   "tagline": "Agenda tu cita en minutos",
   "nav_garage": "Mi garaje",
   "account_nav": "Mi cuenta",
@@ -21,6 +23,7 @@
   "home_vehicles_cta": "Mis vehículos",
   "home_trust_1": "Horarios disponibles en línea",
   "home_trust_2": "Atención personalizada",
+  "home_service_area": "Servicio a domicilio en Cóbano, Santa Teresa y alrededores",
   "home_feature_kicker": "Atención que se entiende",
   "home_feature_title": "Primero revisamos. Luego te explicamos.",
   "home_feature_copy": "Recibe información de tu vehículo y un proceso transparente desde la primera conversación.",

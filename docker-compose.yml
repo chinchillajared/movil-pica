@@ -56,7 +56,10 @@ services:
       - mechanic_net
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        SITE_URL: ${SITE_URL:-http://localhost:8081}
     container_name: mechanic_frontend
     restart: unless-stopped
     ports:

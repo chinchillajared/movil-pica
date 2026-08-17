@@ -41,7 +41,10 @@
     ├── tailwind.config.js
     ├── postcss.config.js
     ├── src/input.css            # Tailwind source entry (shared component classes)
-    ├── locales/                 # Client-side i18n JSON (ES / EN)
+     ├── locales/                 # Client-side i18n JSON (ES / EN)
+     ├── robots.txt               # Crawler rules (rewritten with SITE_URL at build time)
+     ├── sitemap.xml              # Indexable public URLs
+     ├── llms.txt                 # Markdown summary for LLM-oriented agents
     ├── icons/                   # Static SVG icons served at /icons/
     ├── shared/
     │   ├── api.js               # Fetch wrapper — auto-prepends /api/, JSON parse
@@ -96,6 +99,9 @@ docker compose up -d        # start services
 - **UI:** use Tailwind utility classes and the shared component classes defined
   in `frontend/src/input.css` (`btn-primary`, `btn-secondary`, `card`,
   `field-input`, `badge-*`, …). Keep the design consistent across pages.
+- **Mechanic mobile navigation:** keep the menu toggle beside the logo in the
+  header. The sidebar must provide an explicit close control and close when a
+  navigation item, the backdrop or the `Escape` key is used.
 - **Dialogs:** never use native `alert()`/`confirm()`/`prompt()` for
   user-facing messages. Use the shared styled modals `showMessage()` /
   `showConfirm()` from `frontend/shared/api.js`.
@@ -170,6 +176,8 @@ can preserve transparency.
 - Rebuild Tailwind after any class changes: `npm run build` in `frontend/`.
 - Rebuild the Docker containers to see frontend or backend changes:
   `docker compose build && docker compose up -d`.
+- Set `SITE_URL` before a production frontend build so SEO URLs do not point to
+  localhost.
 - Check that i18n keys exist in both `es.json` and `en.json`.
 - When changing `site_settings`, update the SQLAlchemy model, Pydantic schemas,
   startup `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` setup, CRUD functions, and
